@@ -1,0 +1,3 @@
+module HMCUtilities
+
+end # module
