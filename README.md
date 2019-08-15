@@ -6,5 +6,5 @@
 ![Lifecycle](https://img.shields.io/badge/lifecycle-retired-orange.svg)
 ![Lifecycle](https://img.shields.io/badge/lifecycle-archived-red.svg)
 ![Lifecycle](https://img.shields.io/badge/lifecycle-dormant-blue.svg) -->
-[![Build Status](https://travis-ci.com/salilab/HMCUtilities.jl.svg?branch=master)](https://travis-ci.com/salilab/HMCUtilities.jl)
+[![Build Status](https://travis-ci.org/salilab/HMCUtilities.jl.svg?branch=master)](https://travis-ci.org/salilab/HMCUtilities.jl)
 [![codecov.io](http://codecov.io/github/salilab/HMCUtilities.jl/coverage.svg?branch=master)](http://codecov.io/github/salilab/HMCUtilities.jl?branch=master)
