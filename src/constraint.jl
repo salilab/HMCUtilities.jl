@@ -186,7 +186,7 @@ constrain(::IdentityConstraint, y) = copy(y)
 
 free(::IdentityConstraint, x) = copy(x)
 
-logpdf_correction(::IdentityConstraint, y) = zero(eltype(y))
+free_logpdf_correction(::IdentityConstraint, y) = zero(eltype(y))
 
 
 """
@@ -206,7 +206,7 @@ constrain(c::LowerBoundedConstraint, y) = exp(y) + c.lb
 
 free(c::LowerBoundedConstraint, x) = log(x - c.lb)
 
-logpdf_correction(::LowerBoundedConstraint{T}, y) where {T} = y + zero(T)
+free_logpdf_correction(::LowerBoundedConstraint{T}, y) where {T} = y + zero(T)
 
 
 """
@@ -226,7 +226,7 @@ free(c::UpperBoundedConstraint, x) = log(c.ub - x)
 
 constrain(c::UpperBoundedConstraint, y) = c.ub - exp(y)
 
-logpdf_correction(::UpperBoundedConstraint{T}, y) where {T} = y + zero(T)
+free_logpdf_correction(::UpperBoundedConstraint{T}, y) where {T} = y + zero(T)
 
 
 """
