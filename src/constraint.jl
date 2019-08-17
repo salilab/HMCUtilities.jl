@@ -81,11 +81,11 @@ transformation `x = f⁻¹(y)` with entries `Jᵢⱼ = ∂xᵢ/∂yⱼ`.
 """
 function free_jacobian(c::VariableConstraint, y)
     nf = free_dimension(c)
-    # NOTE: work-around to make forward_free_jacobian type-inferrable
+    # NOTE: work-around to make forward_jacobian type-inferrable
     # see https://github.com/FluxML/Zygote.jl/issues/299
     v = Val(min(nf, ForwardDiff.DEFAULT_CHUNK_THRESHOLD))
     # NOTE: Zygote's (reverse-mode) Jacobians are adjoints
-    Jᵀ = last(Zygote.forward_free_jacobian(y -> constrain(c, y), y, v))
+    Jᵀ = last(Zygote.forward_jacobian(y -> constrain(c, y), y, v))
     return transpose(Jᵀ)
 end
 
