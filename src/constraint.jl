@@ -165,16 +165,17 @@ end
 ###
 
 """
-    IdentityConstraint{N} <: VariableConstraint{N,N}
+    IdentityConstraint{N} <: OneToOneConstraint{N}
 
-Do-nothing constraint, corresponding to the identity function. Included for
-convenient bundling of constrained with unconstrained variables.
+Do-nothing constraint on `ℝⁿ`, corresponding to the identity function on
+`n`-dimensional variables. Included for convenient bundling of constrained
+with unconstrained variables.
 
 # Constructor
 
     IdentityConstraint(n::Int)
 """
-struct IdentityConstraint{N} <: VariableConstraint{N,N} end
+struct IdentityConstraint{N} <: OneToOneConstraint{N} end
 
 IdentityConstraint(n) = IdentityConstraint{n}()
 
