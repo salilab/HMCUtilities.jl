@@ -5,6 +5,9 @@
 using LinearAlgebra:
     logabsdet,
     logdet
+using StatsFuns:
+    logit,
+    logistic
 
 """
     VariableConstraint{NC,NF}
@@ -184,3 +187,89 @@ constrain(::IdentityConstraint, y) = copy(y)
 free(::IdentityConstraint, x) = copy(x)
 
 logpdf_correction(::IdentityConstraint, y) = zero(eltype(y))
+
+
+"""
+    LowerBoundedConstraint{T} <: UnivariateConstraint
+
+Constraint on a scalar that is strictly greater than a lower bound.
+
+# Constructor
+
+    LowerBoundedConstraint(lb)
+"""
+struct LowerBoundedConstraint{T} <: UnivariateConstraint
+    lb::T
+end
+
+constrain(c::LowerBoundedConstraint, y) = exp(y) + c.lb
+
+free(c::LowerBoundedConstraint, x) = log(x - c.lb)
+
+logpdf_correction(::LowerBoundedConstraint{T}, y) where {T} = y + zero(T)
+
+
+"""
+    UpperBoundedConstraint{T} <: UnivariateConstraint
+
+Constraint on a scalar that is strictly less than an upper bound.
+
+# Constructor
+
+    UpperBoundedConstraint(ub)
+"""
+struct UpperBoundedConstraint{T} <: UnivariateConstraint
+    ub::T
+end
+
+free(c::UpperBoundedConstraint, x) = log(c.ub - x)
+
+constrain(c::UpperBoundedConstraint, y) = c.ub - exp(y)
+
+logpdf_correction(::UpperBoundedConstraint{T}, y) where {T} = y + zero(T)
+
+
+"""
+    BoundedConstraint{TL,TU,TD} <: UnivariateConstraint
+
+Constraint on a scalar that is has both an upper and lower bound.
+
+# Constructor
+
+    BoundedConstraint(lb, ub)
+"""
+struct BoundedConstraint{TL,TU,TD} <: UnivariateConstraint
+    lb::TL
+    ub::TU
+    delta::TD
+end
+
+function BoundedConstraint(lb::Real, ub::Real)
+    @assert lb < ub
+    return BoundedConstraint(lb, ub, ub - lb)
+end
+
+free(c::BoundedConstraint, x) = logit((x - c.lb) / c.delta)
+
+constrain(c::BoundedConstraint, y) = c.delta * logistic(y) + c.lb
+
+
+"""
+    TransformConstraint(lb::Real, ub::Real)
+
+Convenient constructor for lower-, upper-, lower- and upper-, and un-bounded
+univariate constraints. The correct type is chosen based on the arguments.
+"""
+function TransformConstraint(lb=-Inf, ub=Inf)
+    @assert lb < ub
+    has_lb, has_ub = isfinite(lb), isfinite(ub)
+    if has_lb && has_ub
+        return BoundedConstraint(lb, ub)
+    elseif has_lb
+        return LowerBoundedConstraint(lb)
+    elseif has_ub
+        return UpperBoundedConstraint(ub)
+    else
+        return IdentityConstraint(1)
+    end
+end
