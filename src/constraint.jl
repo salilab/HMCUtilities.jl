@@ -1,5 +1,5 @@
 #
-# `VariableConstraint`
+# Constraint interface and implementations
 #
 
 using LinearAlgebra:
@@ -158,3 +158,28 @@ function free_logpdf_gradient(c::VariableConstraint, y, logπx, ∇x_logπx)
 
     return logπy, ∇y_logπy
 end
+
+
+###
+### Constraint implementations
+###
+
+"""
+    IdentityConstraint{N} <: VariableConstraint{N,N}
+
+Do-nothing constraint, corresponding to the identity function. Included for
+convenient bundling of constrained with unconstrained variables.
+
+# Constructor
+
+    IdentityConstraint(n::Int)
+"""
+struct IdentityConstraint{N} <: VariableConstraint{N,N} end
+
+IdentityConstraint(n) = IdentityConstraint{n}()
+
+constrain(::IdentityConstraint, y) = copy(y)
+
+free(::IdentityConstraint, x) = copy(x)
+
+logpdf_correction(::IdentityConstraint, y) = zero(eltype(y))
