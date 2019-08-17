@@ -3,6 +3,9 @@
 #
 
 using LinearAlgebra:
+    dot,
+    norm2,
+    normalize,
     logabsdet,
     logdet
 using StatsFuns:
@@ -273,3 +276,67 @@ function TransformConstraint(lb=-Inf, ub=Inf)
         return IdentityConstraint(1)
     end
 end
+
+
+"""
+    UnitVectorConstraint{N} <: OneToOneConstraint{N}
+
+Transformation from an `n`-dimensional unit-vector to an unconstrained
+`n`-dimensional vector. Note that in this case the inverse transformation
+(ℓ²-normalization) is not unique, and therefore the usual log correction to
+the density is undefined.
+
+However, using the fact that a standard multivariate normally distributed
+vector when normalized is uniformly distributed on a sphere, we can correct
+the log pdf wrt `y` by applying a standard multivariate normal prior to `y`.
+The corresponding log density correction is `-½ yᵀ y = -½ |y|²`.
+
+Gradients wrt `x` are pulled back to `y` by Jacobian multiplication. The
+Jacobian in this case is a normalized projection matrix onto the tangent space
+to the sphere at `x`: `J = Πₓ / |y|`, where `Πₓ = I - xᵀ x`.
+
+# Constructor
+
+    UnitVectorConstraint(n::Int)
+"""
+struct UnitVectorConstraint{N} <: OneToOneConstraint{N} end
+
+UnitVectorConstraint(n) = UnitVectorConstraint{n}()
+
+"""
+    normalize2(v)
+
+Compute the ℓ²-norm (length) of `v`.
+"""
+normalize2(v) = normalize(v)
+
+# Workaround for Zygote not currently supporting `rmul!`.
+Zygote.@adjoint function normalize2(v)
+    n = norm2(v)
+    if !isempty(v)
+        vv = v ./ n
+        return vv, Δ -> ((Δ .- vv * (transpose(vv) * Δ)) ./ n,)  # normalized projection
+    else
+        T = typeof(zero(eltype(v)) / n)
+        return T[], Δ -> (nothing,)
+    end
+end
+
+"""
+    half_norm2_sqr(v)
+
+For vector `v`, compute the half of its square ℓ²-norm, `½ |v|²`.
+"""
+half_norm2_sqr(v) = dot(v, v) / 2
+
+Zygote.@adjoint half_norm2_sqr(v) = half_norm2_sqr(v), Δ -> (Δ .* v,)
+
+constrain(::UnitVectorConstraint, y) = normalize2(y)
+
+function free(::UnitVectorConstraint, x)
+    snx = dot(x, x)
+    @assert snx ≈ 1
+    return x
+end
+
+free_logpdf_correction(::UnitVectorConstraint, y) = -half_norm2_sqr(y)
