@@ -22,9 +22,12 @@ vectors.
 To implement a new constraint, simply create a new type of
 `VariableConstraint` and implement `constrain` and `free`.
 
-Functional defaults are provided for `free_logpdf_correction` and
-`free_logpdf_gradient`, though these may be specialized for a given constraint
-for efficiency.
+Functional defaults are provided for `free_jacobian`,
+`free_logpdf_correction`, and `free_logpdf_gradient`. In the univariate case,
+these should just work. However, for multivariate constraints, the latter
+function currently requires one of the former two to be explicitly
+implemented. Any of these functions may be specialized for increased
+efficiency.
 """
 abstract type VariableConstraint{NC,NF} end
 
@@ -155,6 +158,8 @@ function free_logpdf_gradient(c::VariableConstraint, y, logπx, ∇x_logπx)
     x, back_constrain = Zygote.forward(y -> constrain(c, y), y)
     ∇y_logπx = first(back_constrain(∇x_logπx))
 
+    # NOTE: currently, this only works for multivariate constraints if
+    # `free_logpdf_correction` or `free_jacobian` are implemented explicitly.
     logdetJ, back_logdetJ = Zygote.forward(y -> free_logpdf_correction(c, y), y)
     s = Zygote.sensitivity(logdetJ)  # 1
     ∇y_logdetJ = first(back_logdetJ(s))
