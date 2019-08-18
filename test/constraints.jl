@@ -72,7 +72,9 @@ end
             ∇x_logπxs,
             logπys,
             ∇y_logπys;
-            jacobians=jacobians
+            jacobians=jacobians,
+            vtypes=vtypes,
+            mtypes=mtypes
         )
     end
 end
