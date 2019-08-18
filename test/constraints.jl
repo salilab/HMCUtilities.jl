@@ -33,6 +33,9 @@ end
          3.0 4.0]
     b = [5.0, 6.0]
 
+    vtypes = [Vector, SVector{2}, MVector{2}]
+    mtypes = [Matrix, SMatrix{2,2}, MMatrix{2,2}]
+
     xs = [zeros(2), ones(2), [1.0, 2.0]]
     ys = [b, [8.0, 13.0], [10.0, 17.0]]
     logπxs = [-dot(x, x) / 2 for x in xs]
@@ -53,7 +56,9 @@ end
             ∇x_logπxs,
             logπys,
             ∇y_logπys;
-            jacobians=jacobians
+            jacobians=jacobians,
+            vtypes=vtypes,
+            mtypes=mtypes
         )
     end
 
