@@ -92,7 +92,7 @@ function free_jacobian(c::VariableConstraint, y)
     v = Val(min(nf, ForwardDiff.DEFAULT_CHUNK_THRESHOLD))
     # NOTE: Zygote's (reverse-mode) Jacobians are adjoints
     Jᵀ = last(Zygote.forward_jacobian(y -> constrain(c, y), y, v))
-    return transpose(Jᵀ)
+    return Jᵀ'
 end
 
 """
@@ -123,7 +123,7 @@ This function returns `½log(det G)` for the general case of `f: ℝᵐ → ℝ�
 """
 function free_logpdf_correction(c::VariableConstraint, y)
     J = free_jacobian(c, y)
-    return logdet(J * transpose(J)) / 2
+    return logdet(J * J') / 2
 end
 
 _logabsdet(x) = first(logabsdet(x))
@@ -320,7 +320,7 @@ Zygote.@adjoint function normalize2(v)
     n = norm2(v)
     if !isempty(v)
         vv = v ./ n
-        return vv, Δ -> ((Δ .- vv * (transpose(vv) * Δ)) ./ n,)  # normalized projection
+        return vv, Δ -> ((Δ .- vv * (vv' * Δ)) ./ n,)  # normalized projection
     else
         T = typeof(zero(eltype(v)) / n)
         return T[], Δ -> (nothing,)
