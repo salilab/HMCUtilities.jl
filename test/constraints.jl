@@ -3,32 +3,32 @@ import HMCUtilities:
     constrain,
     free
 
+struct TestAffineConstraint{N,TM,TMinv,Tb,F} <: HMCUtilities.VariableConstraint{N,N}
+    M::TM
+    Minv::TMinv
+    b::Tb
+
+    function TestAffineConstraint(M, b, jac_flag)
+        n = length(b)
+        @assert size(M) == (n, n)
+        Minv = inv(M)
+        return new{n,typeof(M),typeof(Minv),typeof(b),jac_flag}(M, Minv, b)
+    end
+end
+
+TestAffineConstraintWithJac{N,TM,TMinv,Tb} = TestAffineConstraint{N,TM,TMinv,Tb,true}
+TestAffineConstraintWithNoJac{N,TM,TMinv,Tb} = TestAffineConstraint{N,TM,TMinv,Tb,false}
+
+HMCUtilities.constrain(c::TestAffineConstraint, y) = c.Minv * (y - c.b)
+HMCUtilities.free(c::TestAffineConstraint, x) = c.M * x + c.b
+
+HMCUtilities.free_jacobian(c::TestAffineConstraintWithJac, y) = c.Minv
+
+function HMCUtilities.free_logpdf_correction(c::TestAffineConstraintWithNoJac, y)
+    return first(logabsdet(c.Minv))
+end
+
 @testset "defaults" begin
-    struct TestAffineConstraint{N,TM,TMinv,Tb,F} <: HMCUtilities.VariableConstraint{N,N}
-        M::TM
-        Minv::TMinv
-        b::Tb
-
-        function TestAffineConstraint(M, b, jac_flag)
-            n = length(b)
-            @assert size(M) == (n, n)
-            Minv = inv(M)
-            return new{n,typeof(M),typeof(Minv),typeof(b),jac_flag}(M, Minv, b)
-        end
-    end
-
-    TestAffineConstraintWithJac{N,TM,TMinv,Tb} = TestAffineConstraint{N,TM,TMinv,Tb,true}
-    TestAffineConstraintWithNoJac{N,TM,TMinv,Tb} = TestAffineConstraint{N,TM,TMinv,Tb,false}
-
-    HMCUtilities.constrain(c::TestAffineConstraint, y) = c.Minv * (y - c.b)
-    HMCUtilities.free(c::TestAffineConstraint, x) = c.M * x + c.b
-
-    HMCUtilities.free_jacobian(c::TestAffineConstraintWithJac, y) = c.Minv
-
-    function HMCUtilities.free_logpdf_correction(c::TestAffineConstraintWithNoJac, y)
-        return first(logabsdet(c.Minv))
-    end
-
     M = [1.0 2.0;
          3.0 4.0]
     b = [5.0, 6.0]
