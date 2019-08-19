@@ -91,8 +91,8 @@ function free_jacobian(c::VariableConstraint, y)
     # see https://github.com/FluxML/Zygote.jl/issues/299
     v = Val(min(nf, ForwardDiff.DEFAULT_CHUNK_THRESHOLD))
     # NOTE: Zygote's (reverse-mode) Jacobians are adjoints
-    Jᵀ = last(Zygote.forward_jacobian(y -> constrain(c, y), y, v))
-    return Jᵀ'
+    J′ = last(Zygote.forward_jacobian(y -> constrain(c, y), y, v))
+    return adjoint(J′)
 end
 
 """
