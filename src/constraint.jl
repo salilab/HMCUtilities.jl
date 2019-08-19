@@ -107,7 +107,20 @@ function free_jacobian(c::UnivariateConstraint, y)
 end
 
 """
-    free_logpdf_correction(c::VariableConstraint, y) 
+    halflogdetmul(x::AbstractMatrix)
+
+For a matrix `x`, compute `½log(det (x' x))`.
+"""
+halflogdetmul(x) = logdet(x' * x) / 2
+
+# custom adjoint for slight speed-up
+Zygote.@adjoint function halflogdetmul(x::AbstractArray)
+    s = x' * x
+    return logdet(s) / 2, Δ -> (Δ * (x * inv(s)),) # `Δ * x⁺ᵀ`
+end
+
+"""
+    free_logpdf_correction(c::VariableConstraint, y)
 
 From free vector `y`, compute correction to log pdf for transformation. Given
 a transformation `f: x ↦ y`, its inverse `f⁻¹: y ↦ x`, and pdf `π(x)`, the log
@@ -123,7 +136,7 @@ This function returns `½log(det G)` for the general case of `f: ℝᵐ → ℝ�
 """
 function free_logpdf_correction(c::VariableConstraint, y)
     J = free_jacobian(c, y)
-    return logdet(J * J') / 2
+    return halflogdetmul(J)
 end
 
 _logabsdet(x) = first(logabsdet(x))
