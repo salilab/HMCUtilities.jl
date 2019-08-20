@@ -35,8 +35,6 @@ end
 
 @testset "defaults" begin
     @testset "one-to-one" begin
-        vtypes = [Vector]
-
         M = [1.0 2.0;
              3.0 4.0]
         b = [5.0, 6.0]
@@ -47,82 +45,83 @@ end
         logπxs = [-dot(x, x) / 2 for x in xs]
         ∇x_logπxs = [-x for x in xs]
         Minv = inv(M)
-        jacobians = [Minv, Minv, Minv]
-
         logπys = logπxs .- log(2)
         ∇y_logπys = [Minv'x for x in ∇x_logπxs]
 
-        test_constraint(
-            c,
-            xs,
-            ys,
-            logπxs,
-            ∇x_logπxs,
-            logπys,
-            ∇y_logπys;
-            jacobians=jacobians,
-            cvtypes=vtypes,
-            fvtypes=vtypes
-        )
+        for (x, y, logπx, ∇x_logπx, y_exp, logπy_exp, ∇y_logπy_exp) in zip(xs, ys, logπxs, ∇x_logπxs, ys, logπys, ∇y_logπys)
+            test_constraint(
+                c,
+                x,
+                y,
+                logπx,
+                ∇x_logπx,
+                y_exp,
+                logπy_exp,
+                ∇y_logπy_exp
+            )
+        end
     end
 
     @testset "non one-to-one" begin
-        cvtypes = [Vector]
-        fvtypes = [Vector]
-
         c = TestSphericalConstraint()
         xs = [[sqrt(3 / 2), sqrt(3 / 2), 1] ./ 2]
         ys = [π .* [1 / 3, 1 / 4]]
         κμ = 10.0 * [1.0, 0.0, 0.0]
         logπxs = [dot(x, κμ) for x in xs]  # vMF
         ∇x_logπxs = [κμ for x in xs]
-
-        jacobians = [[1 -sqrt(3); 1 sqrt(3); -sqrt(6) 0] ./ (2 * sqrt(2))]
-
         logπys = [(5 * sqrt(6) - log(4 / 3)) / 2]
         ∇y_logπys = [[5 / sqrt(2) + 1 / sqrt(3), -5 * sqrt(3 / 2)]]
 
-        test_constraint(
-            c,
-            xs,
-            ys,
-            logπxs,
-            ∇x_logπxs,
-            logπys,
-            ∇y_logπys;
-            jacobians=jacobians,
-            cvtypes=cvtypes,
-            fvtypes=fvtypes
-        )
+        for (x, y, logπx, ∇x_logπx, y_exp, logπy_exp, ∇y_logπy_exp) in zip(xs, ys, logπxs, ∇x_logπxs, ys, logπys, ∇y_logπys)
+            test_constraint(
+                c,
+                x,
+                y,
+                logπx,
+                ∇x_logπx,
+                y_exp,
+                logπy_exp,
+                ∇y_logπy_exp;
+                test_type_stability=false
+            )
+        end
     end
 end
 
 @testset "IdentityConstraint" begin
-    @testset "n = $n" for n in 1:3
-        vtypes = [Vector]
-        m = 3
+    @testset "vector n = $n" for n in 1:3
+        for m in 1:3
+            c = HMCUtilities.IdentityConstraint(n)
+            x = randn(n)
+            y = copy(x)
+            logπx = -dot(x, x) / 2
+            ∇x_logπx = -x
+            logπy_exp = copy(logπx)
+            ∇y_logπy_exp = copy(∇x_logπx)
+            test_constraint(c, x, y, logπx, ∇x_logπx, y, logπy_exp, ∇y_logπy_exp)
+        end
+    end
 
-        xs = [randn(n) for _ in 1:m]
-        ys = copy.(xs)
-        logπxs = [-dot(x, x) / 2 for x in xs]
-        ∇x_logπxs = [-x for x in xs]
-        jacobians = [Diagonal(ones(n)) for x in xs]
-
-        logπys = copy(logπxs)
-        ∇y_logπys = copy.(∇x_logπxs)
-
-        c = HMCUtilities.IdentityConstraint(n)
+    @testset "scalar" begin
+        c = HMCUtilities.IdentityConstraint(1)
+        vtypes = [Float64, Float32]
+        x = randn()
+        y = copy(x)
+        logπx = -dot(x, x) / 2
+        ∇x_logπx = -x
+        logπy_exp = copy(logπx)
+        ∇y_logπy_exp = copy(∇x_logπx)
         test_constraint(
             c,
-            xs,
-            ys,
-            logπxs,
-            ∇x_logπxs,
-            logπys,
-            ∇y_logπys;
-            jacobians=jacobians,
+            x,
+            y,
+            logπx,
+            ∇x_logπx,
+            y,
+            logπy_exp,
+            ∇y_logπy_exp;
             cvtypes=vtypes,
-            fvtypes=vtypes,
+            fvtypes=vtypes
         )
     end
 end
