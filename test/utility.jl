@@ -16,15 +16,15 @@ function test_constraint(
         logπys,
         ∇y_logπys;
         jacobians=[],
-        vtypes=[Vector],
-        mtypes=[Matrix]
+        cvtypes=[Vector],
+        fvtypes=[Vector],
     )
     @test isa(c, VariableConstraint)
 
-    @testset "$VType, $MType" for (VType, MType) in zip(vtypes, mtypes)
-        txs = convert.(VType, xs)
-        tys = convert.(VType, ys)
-        t∇x_logπxs = convert.(VType, ∇x_logπxs)
+    @testset "$CVType, $FVType" for (CVType, FVType) in zip(cvtypes, fvtypes)
+        txs = convert.(CVType, xs)
+        tys = convert.(FVType, ys)
+        t∇x_logπxs = convert.(CVType, ∇x_logπxs)
 
         @testset "constrain" begin
             for (x_exp, y) in zip(txs, tys)

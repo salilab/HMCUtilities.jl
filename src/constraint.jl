@@ -185,14 +185,14 @@ function free_logpdf_gradient(c::VariableConstraint, y, logπx, ∇x_logπx)
     TG = typeof(zero(eltype(∇x_logπx)) * zero(eltype(y)))
 
     x, back_constrain = Zygote.forward(y -> constrain(c, y), y)
-    ∇y_logπx = first(back_constrain(∇x_logπx))
+    ∇y_logπx = back_constrain(∇x_logπx)
 
     logdetJ, back_logdetJ = Zygote.forward(y -> free_logpdf_correction(c, y), y)
     s = Zygote.sensitivity(logdetJ)  # 1
-    ∇y_logdetJ = first(back_logdetJ(s))
+    ∇y_logdetJ = back_logdetJ(s)
 
     logπy = logπx + logdetJ
-    ∇y_logπy = Zygote.accum(∇y_logπx, ∇y_logdetJ)
+    ∇y_logπy = first(Zygote.accum(∇y_logπx, ∇y_logdetJ))
 
     return logπy, ∇y_logπy
 end
