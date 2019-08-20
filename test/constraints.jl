@@ -33,6 +33,14 @@ function HMCUtilities.free(c::TestSphericalConstraint, x)
     return [θ, ϕ]
 end
 
+
+struct TestSquareConstraint <: HMCUtilities.UnivariateConstraint end
+
+HMCUtilities.constrain(c::TestSquareConstraint, y::Real) = y^2
+
+HMCUtilities.free(c::TestSquareConstraint, x::Real) = sqrt(x)
+
+
 @testset "defaults" begin
     @testset "one-to-one" begin
         M = [1.0 2.0;
@@ -81,8 +89,50 @@ end
                 ∇x_logπx,
                 y_exp,
                 logπy_exp,
+                ∇y_logπy_exp
+            )
+        end
+    end
+
+    @testset "univariate" begin
+        c = TestSquareConstraint()
+        x = rand()
+        y = -sqrt(x)
+        y_exp = abs(y)
+        logπx = x^2 / 2
+        ∇x_logπx = x
+        logπy_exp = logπx + log(2 * abs(y))
+        ∇y_logπy_exp = 2 * y^3 + inv(y)
+
+        @testset "scalar" begin
+            vtypes = [Float64]
+            test_constraint(
+                c,
+                x,
+                y,
+                logπx,
+                ∇x_logπx,
+                y_exp,
+                logπy_exp,
                 ∇y_logπy_exp;
-                test_type_stability=false
+                cvtypes=vtypes,
+                fvtypes=vtypes
+            )
+        end
+
+        @testset "vector" begin
+            vtypes = [Vector{Float64}]
+            test_constraint(
+                c,
+                [x],
+                [y],
+                logπx,
+                [∇x_logπx],
+                [y_exp],
+                logπy_exp,
+                [∇y_logπy_exp];
+                cvtypes=vtypes,
+                fvtypes=vtypes
             )
         end
     end

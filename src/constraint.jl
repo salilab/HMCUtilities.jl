@@ -69,12 +69,16 @@ From free variable `y`, construct constrained variable.
 """
 function constrain end
 
+constrain(c::UnivariateConstraint, y::AbstractVector) = [constrain(c, @inbounds y[1])]
+
 """
     free(c::VariableConstraint, x)
 
 From constrained variable `x`, construct free variable.
 """
 function free end
+
+free(c::UnivariateConstraint, x::AbstractVector) = [free(c, @inbounds x[1])]
 
 """
     constrain_with_pushlogpdf(c::VariableConstraint, y)
@@ -103,11 +107,12 @@ function constrain_with_pushlogpdf(c::VariableConstraint, y)
 end
 
 function constrain_with_pushlogpdf(c::UnivariateConstraint, y::AbstractArray)
-    x, scalar_push = constrain_with_pushlogpdf(c, y[1])
+    x, scalar_push = constrain_with_pushlogpdf(c, @inbounds y[1])
 
-    return [x], function (logπx, ∇x_logπx::AbstractArray)
-        logπy, ∇y_logπy = scalar_push(logπx, ∇x_logπx[1])
-        return logπy, [∇y_logπy]
+    return Vector{typeof(x)}([x]), function (logπx, ∇x_logπx::AbstractArray)
+        logπy, ∇y_logπy = scalar_push(logπx, @inbounds ∇x_logπx[1])
+        T = promote_type(eltype(logπy), eltype(∇y_logπy))
+        return T(logπy), Vector{T}([∇y_logπy])
     end
 end
 
@@ -248,16 +253,19 @@ struct IdentityConstraint{N} <: OneToOneConstraint{N} end
 IdentityConstraint(n) = IdentityConstraint{n}()
 
 constrain(::IdentityConstraint, y) = y
+constrain(::IdentityConstraint, y::AbstractVector) = y
 
 free(::IdentityConstraint, x) = x
+free(::IdentityConstraint, x::AbstractVector) = x
 
 function constrain_with_pushlogpdf(::IdentityConstraint, y)
     return y, (logπx, ∇x_logπx) -> (logπx, ∇x_logπx)
 end
 
-function constrain_with_pushlogpdf(::IdentityConstraint{1}, y::AbstractArray)
+function constrain_with_pushlogpdf(::IdentityConstraint{1}, y::AbstractVector)
     return y, (logπx, ∇x_logπx) -> (logπx, ∇x_logπx)
 end
+
 
 """
     LowerBoundedConstraint{T} <: UnivariateConstraint
@@ -272,14 +280,14 @@ struct LowerBoundedConstraint{T} <: UnivariateConstraint
     lb::T
 end
 
-constrain(c::LowerBoundedConstraint, y) = exp(y) + c.lb
+constrain(c::LowerBoundedConstraint, y::Real) = exp(y) + c.lb
 
-free(c::LowerBoundedConstraint, x) = log(x - c.lb)
+free(c::LowerBoundedConstraint, x::Real) = log(x - c.lb)
 
-function constrain_with_pushlogpdf(c::LowerBoundedConstraint, y)
+function constrain_with_pushlogpdf(c::LowerBoundedConstraint, y::Real)
     expy = exp(y)
     x = expy + c.lb
-    return x, function (logπx, dx_logπx)
+    return x, function (logπx, dx_logπx::Real)
         return logπx + y, dx_logπx * expy + 1
     end
 end
@@ -298,14 +306,14 @@ struct UpperBoundedConstraint{T} <: UnivariateConstraint
     ub::T
 end
 
-free(c::UpperBoundedConstraint, x) = log(c.ub - x)
+free(c::UpperBoundedConstraint, x::Real) = log(c.ub - x)
 
-constrain(c::UpperBoundedConstraint, y) = c.ub - exp(y)
+constrain(c::UpperBoundedConstraint, y::Real) = c.ub - exp(y)
 
-function constrain_with_pushlogpdf(c::UpperBoundedConstraint, y)
+function constrain_with_pushlogpdf(c::UpperBoundedConstraint, y::Real)
     nexpy = -exp(y)
     x = nexpy + c.ub
-    return x, function (logπx, dx_logπx)
+    return x, function (logπx, dx_logπx::Real)
         return logπx + y, dx_logπx * nexpy + 1
     end
 end
@@ -331,19 +339,19 @@ function BoundedConstraint(lb::Real, ub::Real)
     return BoundedConstraint(lb, ub, ub - lb)
 end
 
-free(c::BoundedConstraint, x) = logit((x - c.lb) / c.delta)
+free(c::BoundedConstraint, x::Real) = logit((x - c.lb) / c.delta)
 
-constrain(c::BoundedConstraint, y) = c.delta * logistic(y) + c.lb
+constrain(c::BoundedConstraint, y::Real) = c.delta * logistic(y) + c.lb
 
 # Avoid recalculating logistic
-function constrain_with_pushlogpdf(c::BoundedConstraint, y)
+function constrain_with_pushlogpdf(c::BoundedConstraint, y::Real)
     z = logistic(y)
     delz = c.delta * z
     x = delz + c.lb
     dy_dx = delz * (1 - z)
     logdetJ = log(dy_dx)
     dy_logdetJ = 1 - 2z
-    return x, function (logπx, dx_logπx)
+    return x, function (logπx, dx_logπx::Real)
         return logπx + logdetJ, dx_logπx * dy_dx + dy_logdetJ
     end
 end

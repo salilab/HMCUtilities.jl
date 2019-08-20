@@ -58,8 +58,8 @@ function test_constraint(
             @testset "type stability" begin
                 @inferred free(c, tx)
                 @inferred constrain(c, ty)
-                @inferred constrain_with_pushlogpdf(c, ty)
-                x2, pushlogpdf = constrain_with_pushlogpdf(c, ty)
+                @inferred (y -> constrain_with_pushlogpdf(c, y)[1])(ty)
+                _, pushlogpdf = constrain_with_pushlogpdf(c, ty)
                 @inferred pushlogpdf(logπx, ∇x_logπx)
             end
         end
