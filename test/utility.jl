@@ -1,3 +1,4 @@
+using Zygote
 using HMCUtilities:
     VariableConstraint,
     free_dimension,
@@ -52,6 +53,12 @@ function test_constraint(
             @test logπy ≈ logπy_exp
             @test _size(∇y_logπy) == (free_dimension(c),)
             @test ∇y_logπy ≈ ∇y_logπy_exp
+        end
+
+        @testset "jacobian consistency" begin
+            J = HMCUtilities.constrain_jacobian(c, ty)
+            J2, back = Zygote.forward(HMCUtilities.constrain_jacobian, c, ty)
+            @test J ≈ J2
         end
 
         if test_type_stability
