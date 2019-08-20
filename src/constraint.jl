@@ -187,8 +187,6 @@ function free_logpdf_gradient(c::VariableConstraint, y, logπx, ∇x_logπx)
     x, back_constrain = Zygote.forward(y -> constrain(c, y), y)
     ∇y_logπx = first(back_constrain(∇x_logπx))
 
-    # NOTE: currently, this only works for multivariate constraints if
-    # `free_logpdf_correction` or `free_jacobian` are implemented explicitly.
     logdetJ, back_logdetJ = Zygote.forward(y -> free_logpdf_correction(c, y), y)
     s = Zygote.sensitivity(logdetJ)  # 1
     ∇y_logdetJ = first(back_logdetJ(s))
