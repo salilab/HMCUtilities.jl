@@ -22,12 +22,9 @@ vectors.
 To implement a new constraint, simply create a new type of
 `VariableConstraint` and implement `constrain` and `free`.
 
-Functional defaults are provided for `free_jacobian`,
-`free_logpdf_correction`, and `free_logpdf_gradient`. In the univariate case,
-these should just work. However, for multivariate constraints, the latter
-function currently requires one of the former two to be explicitly
-implemented. Any of these functions may be specialized for increased
-efficiency.
+Functional defaults are provided for `free_jacobian`, `free_logpdf_correction`,
+and `free_logpdf_gradient`. Any of these functions may be specialized for
+increased efficiency.
 """
 abstract type VariableConstraint{NC,NF} end
 
@@ -93,6 +90,25 @@ function free_jacobian(c::VariableConstraint, y)
     # NOTE: Zygote's (reverse-mode) Jacobians are adjoints
     J′ = last(Zygote.forward_jacobian(y -> constrain(c, y), y, v))
     return adjoint(J′)
+end
+
+# NOTE: Workaround until Zygote supports nesting Jacobians
+# see https://github.com/FluxML/Zygote.jl/issues/305
+Zygote.@adjoint function free_jacobian(c::VariableConstraint, y::AbstractVector)
+    nf = free_dimension(c)
+    nc = constrain_dimension(c)
+
+    jac(y) = ForwardDiff.jacobian(y->constrain(c, y), y)
+    J = similar(y, (nc, nf))
+    diffres = DiffResults.JacobianResult(J, y)
+    diffres = ForwardDiff.jacobian!(diffres, jac, y)
+    J = DiffResults.value(diffres)
+    ∇y_J = reshape(DiffResults.jacobian(diffres), (nc, nf, nf))
+
+    return J, function (J̄)
+        @einsum ȳ[k] := J̄[i,j] * ∇y_J[i,j,k]
+        return (nothing, ȳ)
+    end
 end
 
 """
