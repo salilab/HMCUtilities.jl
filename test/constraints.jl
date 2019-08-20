@@ -215,3 +215,44 @@ end
         )
     end
 end
+
+
+@testset "UpperBoundedConstraint" begin
+    vtypes = [Float64]
+
+    @testset "ub=-5, y=0" begin
+        c = HMCUtilities.UpperBoundedConstraint(-5.0)
+        (y, x, logπx, ∇x_logπx, logπy_exp, ∇y_logπy_exp) = (0, -6, -18, 6, -18, -5)
+        test_constraint(
+            c,
+            x,
+            y,
+            logπx,
+            ∇x_logπx,
+            y,
+            logπy_exp,
+            ∇y_logπy_exp;
+            cvtypes=vtypes,
+            fvtypes=vtypes
+        )
+    end
+
+    @testset "ub=5, y=-5" begin
+        c = HMCUtilities.UpperBoundedConstraint(5.0)
+        (y, x, logπx, ∇x_logπx, logπy_exp, ∇y_logπy_exp) = (
+            -5, 4.99326205300, -12.4663329650, -4.99326205300, -17.4663329650, 1.03364433507
+        )
+        test_constraint(
+            c,
+            x,
+            y,
+            logπx,
+            ∇x_logπx,
+            y,
+            logπy_exp,
+            ∇y_logπy_exp;
+            cvtypes=vtypes,
+            fvtypes=vtypes
+        )
+    end
+end
