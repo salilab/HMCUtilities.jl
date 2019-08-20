@@ -122,6 +122,10 @@ function free_jacobian(c::UnivariateConstraint, y)
     return ∂x_∂y
 end
 
+function free_jacobian(c::UnivariateConstraint, y::AbstractArray)
+    return [free_jacobian(c, y[1])]
+end
+
 """
     halflogdetmul(x::AbstractMatrix)
 

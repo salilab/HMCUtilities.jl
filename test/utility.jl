@@ -1,4 +1,5 @@
 using HMCUtilities:
+    VariableConstraint,
     free_dimension,
     constrain_dimension,
     free,

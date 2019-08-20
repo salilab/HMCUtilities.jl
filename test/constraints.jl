@@ -96,3 +96,33 @@ end
         )
     end
 end
+
+@testset "IdentityConstraint" begin
+    @testset "n = $n" for n in 1:3
+        vtypes = [Vector]
+        m = 3
+
+        xs = [randn(n) for _ in 1:m]
+        ys = copy.(xs)
+        logπxs = [-dot(x, x) / 2 for x in xs]
+        ∇x_logπxs = [-x for x in xs]
+        jacobians = [Diagonal(ones(n)) for x in xs]
+
+        logπys = copy(logπxs)
+        ∇y_logπys = copy.(∇x_logπxs)
+
+        c = HMCUtilities.IdentityConstraint(n)
+        test_constraint(
+            c,
+            xs,
+            ys,
+            logπxs,
+            ∇x_logπxs,
+            logπys,
+            ∇y_logπys;
+            jacobians=jacobians,
+            cvtypes=vtypes,
+            fvtypes=vtypes,
+        )
+    end
+end
