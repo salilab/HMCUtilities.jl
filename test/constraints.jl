@@ -19,10 +19,6 @@ end
 HMCUtilities.constrain(c::TestAffineConstraint, y) = c.Minv * (y - c.b)
 HMCUtilities.free(c::TestAffineConstraint, x) = c.M * x + c.b
 
-
-end
-
-
 @testset "defaults" begin
     vtypes = [Vector, SVector{2}, MVector{2}]
     mtypes = [Matrix, SMatrix{2,2}, MMatrix{2,2}]
