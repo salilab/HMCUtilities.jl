@@ -175,3 +175,43 @@ end
         )
     end
 end
+
+@testset "LowerBoundedConstraint" begin
+    vtypes = [Float64]
+
+    @testset "lb=-5, y=0" begin
+        c = HMCUtilities.LowerBoundedConstraint(-5.0)
+        (y, x, logπx, ∇x_logπx, logπy_exp, ∇y_logπy_exp) = (0, -4, -8, 4, -8, 5)
+        test_constraint(
+            c,
+            x,
+            y,
+            logπx,
+            ∇x_logπx,
+            y,
+            logπy_exp,
+            ∇y_logπy_exp;
+            cvtypes=vtypes,
+            fvtypes=vtypes
+        )
+    end
+
+    @testset "lb=5, y=-5" begin
+        c = HMCUtilities.LowerBoundedConstraint(5.0)
+        (y, x, logπx, ∇x_logπx, logπy_exp, ∇y_logπy_exp) = (
+            -5, 5.00673794700, -12.5337124350, -5.00673794700, -17.5337124350, 0.966264865075
+        )
+        test_constraint(
+            c,
+            x,
+            y,
+            logπx,
+            ∇x_logπx,
+            y,
+            logπy_exp,
+            ∇y_logπy_exp;
+            cvtypes=vtypes,
+            fvtypes=vtypes
+        )
+    end
+end
