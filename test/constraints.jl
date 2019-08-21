@@ -256,3 +256,68 @@ end
         )
     end
 end
+
+@testset "BoundedConstraint" begin
+    vtypes = [Float64]
+
+    @testset "lb=0, ub=1" begin
+        c = HMCUtilities.BoundedConstraint(0.0, 1.0)
+        @testset "y=-20" begin
+            (y, x, logπx, ∇x_logπx, logπy_exp, ∇y_logπy_exp) = (
+                -20, 2.0611536181902035814e-9, 0, 0, -20, 1
+            )
+            test_constraint(
+                c,
+                x,
+                y,
+                logπx,
+                ∇x_logπx,
+                y,
+                logπy_exp,
+                ∇y_logπy_exp;
+                cvtypes=vtypes,
+                fvtypes=vtypes
+            )
+        end
+
+        @testset "y=20" begin
+            (y, x, logπx, ∇x_logπx, logπy_exp, ∇y_logπy_exp) = (
+                20, 0.99999999793884638181, -0.5, -1, -20.5, -1
+            )
+            test_constraint(
+                c,
+                x,
+                y,
+                logπx,
+                ∇x_logπx,
+                y,
+                logπy_exp,
+                ∇y_logπy_exp;
+                cvtypes=vtypes,
+                fvtypes=vtypes
+            )
+        end
+    end
+
+    c = HMCUtilities.BoundedConstraint(-5.0, 5.0)
+    @testset "lb=-5, ub=5" begin
+        @testset "y=1" begin
+            (y, x, logπx, ∇x_logπx, logπy_exp, ∇y_logπy_exp) = (
+                1, 2.310585786, -2.669403338, -2.310585786, -1.993341620, -5.005004541
+            )
+            test_constraint(
+                c,
+                x,
+                y,
+                logπx,
+                ∇x_logπx,
+                y,
+                logπy_exp,
+                ∇y_logπy_exp;
+                cvtypes=vtypes,
+                fvtypes=vtypes
+            )
+
+        end
+    end
+end
