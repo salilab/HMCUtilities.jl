@@ -321,3 +321,22 @@ end
         end
     end
 end
+
+@testset "TransformConstraint" begin
+    (lb, ub) = (-rand(), rand())
+    @test_throws AssertionError HMCUtilities.TransformConstraint(ub, lb)
+
+    c = HMCUtilities.TransformConstraint(lb, Inf)
+    @test c === HMCUtilities.LowerBoundedConstraint(lb)
+
+    c = HMCUtilities.TransformConstraint(-Inf, ub)
+    @test c === HMCUtilities.UpperBoundedConstraint(ub)
+
+    c = HMCUtilities.TransformConstraint(lb, ub)
+    @test c === HMCUtilities.BoundedConstraint(lb, ub)
+
+    c = HMCUtilities.TransformConstraint()
+    @test c === HMCUtilities.IdentityConstraint(1)
+    c = HMCUtilities.TransformConstraint(-Inf, Inf)
+    @test c === HMCUtilities.IdentityConstraint(1)
+end
