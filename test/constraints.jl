@@ -299,8 +299,8 @@ end
         end
     end
 
-    c = HMCUtilities.BoundedConstraint(-5.0, 5.0)
     @testset "lb=-5, ub=5" begin
+        c = HMCUtilities.BoundedConstraint(-5.0, 5.0)
         @testset "y=1" begin
             (y, x, logπx, ∇x_logπx, logπy_exp, ∇y_logπy_exp) = (
                 1, 2.310585786, -2.669403338, -2.310585786, -1.993341620, -5.005004541
