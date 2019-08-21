@@ -33,7 +33,7 @@ function test_constraint(
         @testset "free" begin
             y2 = free(c, tx)
             @test _size(y2) == (free_dimension(c),)
-            @test y2 ≈ y_exp
+            @test y2 ≈ convert(FVType, y_exp)
             x3 = constrain(c, y2)
             @test _size(x3) == (constrain_dimension(c),)
             @test x3 ≈ tx
@@ -42,7 +42,7 @@ function test_constraint(
         @testset "constrain" begin
             x2 = constrain(c, ty)
             @test _size(x2) == (constrain_dimension(c),)
-            @test x2 ≈ x
+            @test x2 ≈ tx
         end
 
         @testset "constrain_with_pushlogpdf" begin
@@ -50,9 +50,9 @@ function test_constraint(
             @test x2 ≈ constrain(c, ty)
             logπy, ∇y_logπy = pushlogpdf(logπx, ∇x_logπx)
             @test isreal(logπy)
-            @test logπy ≈ logπy_exp
+            @test logπy ≈ convert(eltype(FVType), logπy_exp)
             @test _size(∇y_logπy) == (free_dimension(c),)
-            @test ∇y_logπy ≈ ∇y_logπy_exp
+            @test ∇y_logπy ≈ convert(FVType, ∇y_logπy_exp)
         end
 
         @testset "jacobian consistency" begin

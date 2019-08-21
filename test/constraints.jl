@@ -105,7 +105,7 @@ HMCUtilities.free(c::TestSquareConstraint, x::Real) = sqrt(x)
         ∇y_logπy_exp = 2 * y^3 + inv(y)
 
         @testset "scalar" begin
-            vtypes = [Float64]
+            vtypes = [Float64, Float32]
             test_constraint(
                 c,
                 x,
@@ -121,7 +121,7 @@ HMCUtilities.free(c::TestSquareConstraint, x::Real) = sqrt(x)
         end
 
         @testset "vector" begin
-            vtypes = [Vector{Float64}]
+            vtypes = [Vector{Float64}, Vector{Float32}]
             test_constraint(
                 c,
                 [x],
@@ -177,7 +177,7 @@ end
 end
 
 @testset "LowerBoundedConstraint" begin
-    vtypes = [Float64]
+    vtypes = [Float64, Float32]
 
     @testset "lb=-5, y=0" begin
         c = HMCUtilities.LowerBoundedConstraint(-5.0)
@@ -218,7 +218,7 @@ end
 
 
 @testset "UpperBoundedConstraint" begin
-    vtypes = [Float64]
+    vtypes = [Float64, Float32]
 
     @testset "ub=-5, y=0" begin
         c = HMCUtilities.UpperBoundedConstraint(-5.0)
@@ -264,7 +264,7 @@ end
         c = HMCUtilities.BoundedConstraint(0.0, 1.0)
         @testset "y=-20" begin
             (y, x, logπx, ∇x_logπx, logπy_exp, ∇y_logπy_exp) = (
-                -20, 2.0611536181902035814e-9, 0, 0, -20, 1
+                -20, 2.0611536181902035814e-9, 0.0, 0.0, -20, 1.0
             )
             test_constraint(
                 c,
