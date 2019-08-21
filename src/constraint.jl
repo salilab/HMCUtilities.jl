@@ -446,3 +446,147 @@ function constrain_with_pushlogpdf(::UnitVectorConstraint, y)
         return logπx + logdetJ, pushgrad(∇x_logπx ./ ny)
     end
 end
+
+
+"""
+    JointConstraint{TC,RC,RF,NC,NF} <: VariableConstraint{NC,NF}
+
+Joint transformation on a series of constraints. This constraint type
+conveniently binds together a series of transformations on non-overlapping
+subarrays of a longer parameter array.
+
+# Constructor
+
+    JointConstraint(constraints::VariableConstraint...)
+"""
+struct JointConstraint{TC,RC,RF,NC,NF} <: VariableConstraint{NC,NF}
+    constraints::TC
+
+    function JointConstraint(constraints...)
+        ncs = map(constrain_dimension, constraints)
+        nc = sum(ncs)
+        cranges = _ranges_from_lengths(ncs)
+
+        nfs = map(free_dimension, constraints)
+        nf = sum(nfs)
+        franges = _ranges_from_lengths(nfs)
+
+        cs = tuple(constraints...)
+
+        return new{typeof(cs),cranges,franges,nc,nf}(cs)
+    end
+end
+
+function _ranges_from_lengths(lengths)
+    ranges = []
+    k = 1
+    for len in lengths
+        if len == 1
+            push!(ranges, k)
+        else
+            push!(ranges, k:(k + len - 1))
+        end
+        k += len
+    end
+    return tuple(ranges...)
+end
+
+nconstraints(jc::JointConstraint) = length(jc.constraints)
+
+constrain_ranges(jc::JointConstraint{TC,RC}) where {TC,RC} = RC
+
+free_ranges(jc::JointConstraint{TC,RC,RF}) where {TC,RC,RF} = RF
+
+function Base.show(io::IO, mime::MIME"text/plain", jc::JointConstraint)
+    print(io, "JointConstraint(")
+    nconstraints = length(jc.constraints)
+    if nconstraints > 0
+        print(io, "$(repr(mime, jc.constraints[1]))")
+        if nconstraints > 10
+            print(io, ", $(repr(mime, jc.constraints[2]))")
+            print(io, ", ...")
+            print(io, ", $(repr(mime, jc.constraints[end-1]))")
+            print(io, ", $(repr(mime, jc.constraints[end]))")
+        else
+            for i in 2:nconstraints
+                print(io, ", $(repr(mime, jc.constraints[i]))")
+            end
+        end
+    end
+    print(io, ")")
+end
+
+Base.@propagate_inbounds @inline _view(x, ind) = view(x, ind)
+Base.@propagate_inbounds @inline _view(x, ind::Int) = getindex(x, ind)
+
+function _parallel_free(cs, cranges, franges, nf, x)
+    y = similar(x, nf)
+    @simd for i in 1:length(cs)
+        @inbounds setindex!(y, free(cs[i], _view(x, cranges[i])), franges[i])
+    end
+    return y
+end
+
+function free(jc::JointConstraint, x)
+    @assert length(x) == constrain_dimension(jc)
+    return _parallel_free(
+        jc.constraints,
+        constrain_ranges(jc),
+        free_ranges(jc),
+        free_dimension(jc),
+        x
+    )
+end
+
+function _parallel_constrain(cs, cranges, franges, nc, y)
+    x = similar(y, nc)
+    @simd for i in 1:length(cs)
+        @inbounds setindex!(x, constrain(cs[i], _view(y, franges[i])), cranges[i])
+    end
+    return x
+end
+
+function constrain(jc::JointConstraint, y)
+    @assert length(y) == free_dimension(jc)
+    return _parallel_constrain(
+        jc.constraints,
+        constrain_ranges(jc),
+        free_ranges(jc),
+        constrain_dimension(jc),
+        y
+    )
+end
+
+function _parallel_constrain_with_pushlogpdf(cs, cranges, franges, nc, nf, y)
+    x = similar(y, nc)
+    pushlogpdfs = []
+    @simd for i in 1:length(cs)
+        @inbounds x_i, push_i = constrain_with_pushlogpdf(cs[i], _view(y, franges[i]))
+        @inbounds setindex!(x, x_i, cranges[i])
+        push!(pushlogpdfs, push_i)
+    end
+    TY = eltype(y)
+    return x, function (logπx, ∇x_logπx)
+        TL = promote_type(TY, eltype(logπx))
+        ∇y_logπy = similar(∇x_logπx, nf)
+        logdetJ::TL = sum(1:length(cs)) do (i)
+            @inbounds logdetJ_i, ∇y_logπy_i = pushlogpdfs[i](zero(logπx), _view(∇x_logπx, cranges[i]))
+            @inbounds setindex!(∇y_logπy, ∇y_logπy_i, franges[i])
+            return logdetJ_i
+        end
+        logπy = logπx + logdetJ
+        return logπy::TL, ∇y_logπy
+    end
+end
+
+function constrain_with_pushlogpdf(jc::JointConstraint, y)
+    @assert length(y) == free_dimension(jc)
+    return _parallel_constrain_with_pushlogpdf(
+        jc.constraints,
+        constrain_ranges(jc),
+        free_ranges(jc),
+        free_dimension(jc),
+        constrain_dimension(jc),
+        y
+    )
+end

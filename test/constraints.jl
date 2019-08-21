@@ -370,3 +370,50 @@ end
         )
     end
 end
+
+@testset "JointConstraint" begin
+    vtypes = [Vector{Float64}, Vector{Float32}]
+
+    cs = [HMCUtilities.IdentityConstraint(3),
+          HMCUtilities.LowerBoundedConstraint(0.0),
+          HMCUtilities.UpperBoundedConstraint(1.0),
+          HMCUtilities.BoundedConstraint(0.0, 1.0),
+          HMCUtilities.UnitVectorConstraint(4)]
+
+    y = Float64[]
+    x = Float64[]
+    y_exp = Float64[]
+    logπx = randn()
+    ∇x_logπx = Float64[]
+    ∇y_logπy_exp = Float64[]
+    logdetJ_exp = sum(cs) do (c)
+        yi = randn(HMCUtilities.free_dimension(c))
+        xi = constrain(c, yi)
+        yi_exp = free(c, xi)
+        ∇x_logπxi = randn(length(xi))
+        _, pushlogpdf = constrain_with_pushlogpdf(c, yi)
+        logdetJi, ∇y_logπyi = pushlogpdf(0.0, ∇x_logπxi)
+        push!(y, yi...)
+        push!(x, xi...)
+        push!(y_exp, yi_exp...)
+        push!(∇x_logπx, ∇x_logπxi...)
+        push!(∇y_logπy_exp, ∇y_logπyi...)
+        return logdetJi
+    end
+    logπy_exp = logπx + logdetJ_exp
+
+    jc = HMCUtilities.JointConstraint(cs...)
+
+    test_constraint(
+        jc,
+        x,
+        y,
+        logπx,
+        ∇x_logπx,
+        y_exp,
+        logπy_exp,
+        ∇y_logπy_exp;
+        cvtypes=vtypes,
+        fvtypes=vtypes
+    )
+end
