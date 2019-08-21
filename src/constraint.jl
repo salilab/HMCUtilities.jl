@@ -2,6 +2,7 @@
 # Constraint interface and implementations
 #
 
+import Base: show
 using LinearAlgebra:
     dot,
     normalize,
@@ -63,15 +64,6 @@ Get the number of dimensions (length) of the constrained vector.
 constrain_dimension(::VariableConstraint{NC}) where {NC} = NC
 
 """
-    constrain(c::VariableConstraint, y)
-
-From free variable `y`, construct constrained variable.
-"""
-function constrain end
-
-constrain(c::UnivariateConstraint, y::AbstractVector) = [constrain(c, @inbounds y[1])]
-
-"""
     free(c::VariableConstraint, x)
 
 From constrained variable `x`, construct free variable.
@@ -79,6 +71,15 @@ From constrained variable `x`, construct free variable.
 function free end
 
 free(c::UnivariateConstraint, x::AbstractVector) = [free(c, @inbounds x[1])]
+
+"""
+    constrain(c::VariableConstraint, y)
+
+From free variable `y`, construct constrained variable.
+"""
+function constrain end
+
+constrain(c::UnivariateConstraint, y::AbstractVector) = [constrain(c, @inbounds y[1])]
 
 """
     constrain_with_pushlogpdf(c::VariableConstraint, y)
@@ -252,11 +253,15 @@ struct IdentityConstraint{N} <: OneToOneConstraint{N} end
 
 IdentityConstraint(n) = IdentityConstraint{n}()
 
-constrain(::IdentityConstraint, y) = y
-constrain(::IdentityConstraint, y::AbstractVector) = y
+function Base.show(io::IO, mime::MIME"text/plain", c::IdentityConstraint{N}) where {N}
+    print(io, "IdentityConstraint($N)")
+end
 
 free(::IdentityConstraint, x) = x
 free(::IdentityConstraint, x::AbstractVector) = x
+
+constrain(::IdentityConstraint, y) = y
+constrain(::IdentityConstraint, y::AbstractVector) = y
 
 function constrain_with_pushlogpdf(::IdentityConstraint, y)
     return y, (logπx, ∇x_logπx) -> (logπx, ∇x_logπx)
@@ -280,9 +285,13 @@ struct LowerBoundedConstraint{T} <: UnivariateConstraint
     lb::T
 end
 
-constrain(c::LowerBoundedConstraint, y::Real) = exp(y) + c.lb
+function Base.show(io::IO, mime::MIME"text/plain", c::LowerBoundedConstraint)
+    print(io, "LowerBoundedConstraint($(c.lb))")
+end
 
 free(c::LowerBoundedConstraint, x::Real) = log(x - c.lb)
+
+constrain(c::LowerBoundedConstraint, y::Real) = exp(y) + c.lb
 
 function constrain_with_pushlogpdf(c::LowerBoundedConstraint, y::Real)
     expy = exp(y)
@@ -304,6 +313,10 @@ Constraint on a scalar that is strictly less than an upper bound.
 """
 struct UpperBoundedConstraint{T} <: UnivariateConstraint
     ub::T
+end
+
+function Base.show(io::IO, mime::MIME"text/plain", c::UpperBoundedConstraint)
+    print(io, "UpperBoundedConstraint($(c.ub))")
 end
 
 free(c::UpperBoundedConstraint, x::Real) = log(c.ub - x)
@@ -332,6 +345,10 @@ struct BoundedConstraint{TL,TU,TD} <: UnivariateConstraint
     lb::TL
     ub::TU
     delta::TD
+end
+
+function Base.show(io::IO, mime::MIME"text/plain", c::BoundedConstraint)
+    print(io, "BoundedConstraint($(c.lb), $(c.ub))")
 end
 
 function BoundedConstraint(lb::Real, ub::Real)
@@ -404,13 +421,17 @@ struct UnitVectorConstraint{N} <: OneToOneConstraint{N} end
 
 UnitVectorConstraint(n) = UnitVectorConstraint{n}()
 
-constrain(::UnitVectorConstraint, y) = normalize(y)
+function Base.show(io::IO, mime::MIME"text/plain", c::UnitVectorConstraint{N}) where {N}
+    print(io, "UnitVectorConstraint($N)")
+end
 
 function free(::UnitVectorConstraint, x)
     snx = dot(x, x)
     @assert snx ≈ 1
     return x
 end
+
+constrain(::UnitVectorConstraint, y) = normalize(y)
 
 # Avoid re-normalizing
 function constrain_with_pushlogpdf(::UnitVectorConstraint, y)
