@@ -565,8 +565,8 @@ function _parallel_constrain_with_pushlogpdf(cs, cranges, franges, nc, nf, y)
         @inbounds setindex!(x, x_i, cranges[i])
         push!(pushlogpdfs, push_i)
     end
-    TY = eltype(y)
     return x, function (logπx, ∇x_logπx)
+        TY = eltype(y)
         TL = promote_type(TY, eltype(logπx))
         ∇y_logπy = similar(∇x_logπx, nf)
         logdetJ::TL = sum(1:length(cs)) do (i)
@@ -575,7 +575,7 @@ function _parallel_constrain_with_pushlogpdf(cs, cranges, franges, nc, nf, y)
             return logdetJ_i
         end
         logπy = logπx + logdetJ
-        return logπy::TL, ∇y_logπy
+        return logπy, ∇y_logπy
     end
 end
 
