@@ -5,6 +5,7 @@
 import Base: show
 using LinearAlgebra:
     dot,
+    norm,
     normalize,
     logabsdet,
     logdet
@@ -431,7 +432,7 @@ function free(::UnitVectorConstraint, x)
     return x
 end
 
-constrain(::UnitVectorConstraint, y) = normalize(y)
+constrain(::UnitVectorConstraint, y) = y ./ norm(y)
 
 # Avoid re-normalizing
 function constrain_with_pushlogpdf(::UnitVectorConstraint, y)
@@ -439,7 +440,8 @@ function constrain_with_pushlogpdf(::UnitVectorConstraint, y)
     ny = sqrt(norm_sqr)
     x = y ./ ny
     logdetJ = -norm_sqr / 2
-    pushgrad = Δ -> Δ .- x .* (dot(x, Δ) + 1)
+    pushgrad = Δ -> Δ .- x .* (dot(x, Δ) + ny)
+
     return x, function (logπx, ∇x_logπx)
         return logπx + logdetJ, pushgrad(∇x_logπx ./ ny)
     end

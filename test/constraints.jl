@@ -340,3 +340,33 @@ end
     c = HMCUtilities.TransformConstraint(-Inf, Inf)
     @test c === HMCUtilities.IdentityConstraint(1)
 end
+
+@testset "UnitVectorConstraint" begin
+    vtypes = [Vector{Float64}, Vector{Float32}]
+
+    @testset "n=$n" for n in 2:4
+        c = HMCUtilities.UnitVectorConstraint(n)
+        κμ = rand() * normalize(randn(n))
+
+        y = randn(n)
+        x = normalize(y)
+        y_exp = copy(x)
+        logπx = dot(x, κμ)  # vMF
+        ∇x_logπx = κμ
+        logπy_exp = logπx - dot(y, y) / 2
+        ∇y_logπy_exp = (I - x * x') * ∇x_logπx / norm(y) - y
+
+        test_constraint(
+            c,
+            x,
+            y,
+            logπx,
+            ∇x_logπx,
+            y_exp,
+            logπy_exp,
+            ∇y_logπy_exp;
+            cvtypes=vtypes,
+            fvtypes=vtypes
+        )
+    end
+end
