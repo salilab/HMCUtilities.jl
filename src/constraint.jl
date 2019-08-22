@@ -167,11 +167,11 @@ end
     constrain_jacobian(c::UnivariateConstraint, y)
 
 From free scalar `y = f(x)`, compute the derivative of the inverse
-transformation `x = f⁻¹(y)`, `∂x/∂y`.
+transformation `x = f⁻¹(y)`, `dx/dy`.
 """
 function constrain_jacobian(c::UnivariateConstraint, y)
-    ∂x_∂y = first(Zygote.gradient(y -> constrain(c, y), y))
-    return ∂x_∂y
+    dx_dy = first(Zygote.gradient(y -> constrain(c, y), y))
+    return dx_dy
 end
 
 function constrain_jacobian(c::UnivariateConstraint, y::AbstractArray)
