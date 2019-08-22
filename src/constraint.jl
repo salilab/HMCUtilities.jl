@@ -377,11 +377,11 @@ function constrain_with_pushlogpdf(c::BoundedConstraint, y::Real)
     z = logistic(y)
     delz = c.delta * z
     x = delz + c.lb
-    dy_dx = delz * (1 - z)
-    logdetJ = log(dy_dx)
+    dx_dy = delz * (1 - z)
     dy_logdetJ = 1 - 2z
     return x, function (logπx, dx_logπx::Real)
-        return logπx + logdetJ, dx_logπx * dy_dx + dy_logdetJ
+        logdetJ = log(dx_dy)
+        return logπx + logdetJ, dx_logπx * dx_dy + dy_logdetJ
     end
 end
 
@@ -448,14 +448,14 @@ constrain(::UnitVectorConstraint, y) = y ./ norm(y)
 
 # Avoid re-normalizing
 function constrain_with_pushlogpdf(::UnitVectorConstraint, y)
-    norm_sqr = dot(y, y)
-    ny = sqrt(norm_sqr)
+    ny = norm(y)
     x = y ./ ny
-    logdetJ = -norm_sqr / 2
     pushgrad = Δ -> Δ .- x .* (dot(x, Δ) + ny)
 
     return x, function (logπx, ∇x_logπx)
-        return logπx + logdetJ, pushgrad(∇x_logπx ./ ny)
+        logdetJ = -ny^2 / 2
+        ∇y_logπy = pushgrad(∇x_logπx ./ ny)
+        return logπx + logdetJ, ∇y_logπy
     end
 end
 
