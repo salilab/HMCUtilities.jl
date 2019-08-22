@@ -145,7 +145,8 @@ end
 
 # NOTE: Workaround until Zygote supports nesting Jacobians
 # see https://github.com/FluxML/Zygote.jl/issues/305
-Zygote.@adjoint function constrain_jacobian(c::VariableConstraint, y::AbstractVector)
+Zygote.@adjoint function constrain_jacobian(c::VariableConstraint,
+                                            y::AbstractVector)
     nf = free_dimension(c)
     nc = constrain_dimension(c)
 
@@ -263,7 +264,8 @@ struct IdentityConstraint{N} <: OneToOneConstraint{N} end
 
 IdentityConstraint(n) = IdentityConstraint{n}()
 
-function Base.show(io::IO, mime::MIME"text/plain", c::IdentityConstraint{N}) where {N}
+function Base.show(io::IO, mime::MIME"text/plain",
+                    c::IdentityConstraint{N}) where {N}
     print(io, "IdentityConstraint($N)")
 end
 
@@ -431,7 +433,8 @@ struct UnitVectorConstraint{N} <: OneToOneConstraint{N} end
 
 UnitVectorConstraint(n) = UnitVectorConstraint{n}()
 
-function Base.show(io::IO, mime::MIME"text/plain", c::UnitVectorConstraint{N}) where {N}
+function Base.show(io::IO, mime::MIME"text/plain",
+                   c::UnitVectorConstraint{N}) where {N}
     print(io, "UnitVectorConstraint($N)")
 end
 
