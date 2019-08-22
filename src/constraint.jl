@@ -501,12 +501,6 @@ function _ranges_from_lengths(lengths)
     return tuple(ranges...)
 end
 
-nconstraints(jc::JointConstraint) = length(jc.constraints)
-
-constrain_ranges(jc::JointConstraint) = jc.cranges
-
-free_ranges(jc::JointConstraint) = jc.franges
-
 function Base.show(io::IO, mime::MIME"text/plain", jc::JointConstraint)
     print(io, "JointConstraint(")
     nconstraints = length(jc.constraints)
