@@ -71,7 +71,10 @@ From constrained variable `x`, construct free variable.
 """
 function free end
 
-free(c::UnivariateConstraint, x::AbstractVector) = [free(c, @inbounds x[1])]
+Base.@propagate_inbounds function free(c::UnivariateConstraint,
+                                       x::AbstractVector)
+    return [free(c, x[1])]
+end
 
 """
     constrain(c::VariableConstraint, y)
@@ -80,7 +83,10 @@ From free variable `y`, construct constrained variable.
 """
 function constrain end
 
-constrain(c::UnivariateConstraint, y::AbstractVector) = [constrain(c, @inbounds y[1])]
+Base.@propagate_inbounds function constrain(c::UnivariateConstraint,
+                                            y::AbstractVector)
+    return [constrain(c, y[1])]
+end
 
 """
     constrain_with_pushlogpdf(c::VariableConstraint, y)
@@ -108,11 +114,14 @@ function constrain_with_pushlogpdf(c::VariableConstraint, y)
     end
 end
 
-function constrain_with_pushlogpdf(c::UnivariateConstraint, y::AbstractArray)
-    x, scalar_push = constrain_with_pushlogpdf(c, @inbounds y[1])
+Base.@propagate_inbounds function constrain_with_pushlogpdf(
+        c::UnivariateConstraint,
+        y::AbstractArray
+    )
+    x, scalar_push = constrain_with_pushlogpdf(c, y[1])
 
-    return Vector{typeof(x)}([x]), function (logπx, ∇x_logπx::AbstractArray)
-        logπy, ∇y_logπy = scalar_push(logπx, @inbounds ∇x_logπx[1])
+    return Vector{typeof(x)}([x]), Base.@propagate_inbounds function (logπx, ∇x_logπx::AbstractArray)
+        logπy, ∇y_logπy = scalar_push(logπx, ∇x_logπx[1])
         T = promote_type(eltype(logπy), eltype(∇y_logπy))
         return T(logπy), Vector{T}([∇y_logπy])
     end
@@ -459,8 +468,10 @@ subarrays of a longer parameter array.
 
     JointConstraint(constraints::VariableConstraint...)
 """
-struct JointConstraint{TC,RC,RF,NC,NF} <: VariableConstraint{NC,NF}
+struct JointConstraint{TC,CR,CF,NC,NF} <: VariableConstraint{NC,NF}
     constraints::TC
+    cranges::CR
+    franges::CF
 
     function JointConstraint(constraints...)
         ncs = map(constrain_dimension, constraints)
@@ -473,19 +484,15 @@ struct JointConstraint{TC,RC,RF,NC,NF} <: VariableConstraint{NC,NF}
 
         cs = tuple(constraints...)
 
-        return new{typeof(cs),cranges,franges,nc,nf}(cs)
+        return new{typeof(cs),typeof(cranges),typeof(franges),nc,nf}(cs, cranges, franges)
     end
 end
 
 function _ranges_from_lengths(lengths)
-    ranges = []
+    ranges = UnitRange{Int}[]
     k = 1
     for len in lengths
-        if len == 1
-            push!(ranges, k)
-        else
-            push!(ranges, k:(k + len - 1))
-        end
+        push!(ranges, k:(k + len - 1))
         k += len
     end
     return tuple(ranges...)
@@ -493,9 +500,9 @@ end
 
 nconstraints(jc::JointConstraint) = length(jc.constraints)
 
-constrain_ranges(jc::JointConstraint{TC,RC}) where {TC,RC} = RC
+constrain_ranges(jc::JointConstraint) = jc.cranges
 
-free_ranges(jc::JointConstraint{TC,RC,RF}) where {TC,RC,RF} = RF
+free_ranges(jc::JointConstraint) = jc.franges
 
 function Base.show(io::IO, mime::MIME"text/plain", jc::JointConstraint)
     print(io, "JointConstraint(")
@@ -516,13 +523,13 @@ function Base.show(io::IO, mime::MIME"text/plain", jc::JointConstraint)
     print(io, ")")
 end
 
-Base.@propagate_inbounds @inline _view(x, ind) = view(x, ind)
-Base.@propagate_inbounds @inline _view(x, ind::Int) = getindex(x, ind)
-
 function _parallel_free(cs, cranges, franges, nf, x)
     y = similar(x, nf)
     @simd for i in 1:length(cs)
-        @inbounds setindex!(y, free(cs[i], _view(x, cranges[i])), franges[i])
+        @inbounds begin
+            xᵢ = view(x, cranges[i])
+            setindex!(y, free(cs[i], xᵢ), franges[i])
+        end
     end
     return y
 end
@@ -531,8 +538,8 @@ function free(jc::JointConstraint, x)
     @assert length(x) == constrain_dimension(jc)
     return _parallel_free(
         jc.constraints,
-        constrain_ranges(jc),
-        free_ranges(jc),
+        jc.cranges,
+        jc.franges,
         free_dimension(jc),
         x
     )
@@ -541,7 +548,10 @@ end
 function _parallel_constrain(cs, cranges, franges, nc, y)
     x = similar(y, nc)
     @simd for i in 1:length(cs)
-        @inbounds setindex!(x, constrain(cs[i], _view(y, franges[i])), cranges[i])
+        @inbounds begin
+            yᵢ = view(y, franges[i])
+            setindex!(x, constrain(cs[i], yᵢ), cranges[i])
+        end
     end
     return x
 end
@@ -550,8 +560,8 @@ function constrain(jc::JointConstraint, y)
     @assert length(y) == free_dimension(jc)
     return _parallel_constrain(
         jc.constraints,
-        constrain_ranges(jc),
-        free_ranges(jc),
+        jc.cranges,
+        jc.franges,
         constrain_dimension(jc),
         y
     )
@@ -560,21 +570,33 @@ end
 function _parallel_constrain_with_pushlogpdf(cs, cranges, franges, nc, nf, y)
     x = similar(y, nc)
     pushlogpdfs = []
-    @simd for i in 1:length(cs)
-        @inbounds x_i, push_i = constrain_with_pushlogpdf(cs[i], _view(y, franges[i]))
-        @inbounds setindex!(x, x_i, cranges[i])
-        push!(pushlogpdfs, push_i)
-    end
-    return x, function (logπx, ∇x_logπx)
-        TY = eltype(y)
-        TL = promote_type(TY, eltype(logπx))
-        ∇y_logπy = similar(∇x_logπx, nf)
-        logdetJ::TL = sum(1:length(cs)) do (i)
-            @inbounds logdetJ_i, ∇y_logπy_i = pushlogpdfs[i](zero(logπx), _view(∇x_logπx, cranges[i]))
-            @inbounds setindex!(∇y_logπy, ∇y_logπy_i, franges[i])
-            return logdetJ_i
+    cinds = 1:length(cs)
+    @simd for i in cinds
+        @inbounds begin
+            yᵢ = view(y, franges[i])
+            xᵢ, pushᵢ = constrain_with_pushlogpdf(cs[i], yᵢ)::Tuple
+            setindex!(x, xᵢ, cranges[i])
         end
-        logπy = logπx + logdetJ
+        push!(pushlogpdfs, pushᵢ)
+    end
+    y1 = @inbounds y[1]
+
+    return x, Base.@propagate_inbounds function (logπx, ∇x_logπx)
+        TL = Base.promote_eltypeof(y1, logπx, ∇x_logπx)
+        ∇y_logπy = similar(∇x_logπx, nf)
+
+        logdetJ = zero(TL)
+        @simd for i in cinds
+            @inbounds begin
+                ∇x_logπxᵢ = view(∇x_logπx, cranges[i])
+                pushᵢ = pushlogpdfs[i]
+                logdetJᵢ, ∇y_logπyᵢ = pushᵢ(zero(logπx), ∇x_logπxᵢ)::Tuple
+                setindex!(∇y_logπy, ∇y_logπyᵢ, franges[i])
+            end
+            logdetJ += logdetJᵢ
+        end
+
+        logπy::TL = logπx + logdetJ
         return logπy, ∇y_logπy
     end
 end
@@ -583,8 +605,8 @@ function constrain_with_pushlogpdf(jc::JointConstraint, y)
     @assert length(y) == free_dimension(jc)
     return _parallel_constrain_with_pushlogpdf(
         jc.constraints,
-        constrain_ranges(jc),
-        free_ranges(jc),
+        jc.cranges,
+        jc.franges,
         free_dimension(jc),
         constrain_dimension(jc),
         y
