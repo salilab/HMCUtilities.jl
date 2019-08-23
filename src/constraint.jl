@@ -102,7 +102,7 @@ logπx, ∇x_logπx = ... # Compute density and its gradient in constrained spac
 logπy, ∇y_logπy = pushlogpdf(logπx, ∇x_logπx)
 ```
 """
-function constrain_with_pushlogpdf(c::VariableConstraint, y)
+function constrain_with_pushlogpdf(c, y)
     x, pushgrad = constrain_with_pushgrad(c, y)
 
     function pushlogpdf(logπx)
@@ -143,7 +143,7 @@ end
 From free vector `y = f(x)`, compute the Jacobian matrix of the inverse
 transformation `x = f⁻¹(y)` with entries `Jᵢⱼ = ∂xᵢ/∂yⱼ`.
 """
-function constrain_jacobian(c::VariableConstraint, y)
+function constrain_jacobian(c, y)
     nf = free_dimension(c)
     # NOTE: work-around to make forward_jacobian type-inferrable
     # see https://github.com/FluxML/Zygote.jl/issues/299
@@ -155,7 +155,7 @@ end
 
 # NOTE: Workaround until Zygote supports nesting Jacobians
 # see https://github.com/FluxML/Zygote.jl/issues/305
-Zygote.@adjoint function constrain_jacobian(c::VariableConstraint,
+Zygote.@adjoint function constrain_jacobian(c,
                                             y::AbstractVector)
     nf = free_dimension(c)
     nc = constrain_dimension(c)
@@ -219,7 +219,7 @@ This result is known as the area formula.
 
 This function returns `½log(det G)` for the general case of `f: ℝᵐ → ℝⁿ`.
 """
-function free_logpdf_correction(c::VariableConstraint, y)
+function free_logpdf_correction(c, y)
     @assert free_dimension(c) <= constrain_dimension(c)
     J = constrain_jacobian(c, y)
     return halflogdetmul(J)
@@ -253,7 +253,7 @@ function free_logpdf_correction_with_grad(c, y)
     return logdetJ::T, ∇y_logdetJ
 end
 
-function constrain_with_pushgrad(c::VariableConstraint, y)
+function constrain_with_pushgrad(c, y)
     x, back = Zygote.forward(constrain, c, y)
 
     return x, ∇x -> _format_grad(y, back(∇x)[2])
