@@ -48,9 +48,11 @@ function test_constraint(
         @testset "constrain_with_pushlogpdf" begin
             x2, pushlogpdf = constrain_with_pushlogpdf(c, ty)
             @test x2 ≈ constrain(c, ty)
-            logπy, ∇y_logπy = pushlogpdf(logπx, ∇x_logπx)
+            logπy = pushlogpdf(logπx)
             @test isreal(logπy)
             @test logπy ≈ convert(eltype(FVType), logπy_exp)
+            logπy2, ∇y_logπy = pushlogpdf(logπx, ∇x_logπx)
+            @test logπy2 ≈ logπy
             @test _size(∇y_logπy) == (free_dimension(c),)
             @test ∇y_logπy ≈ convert(FVType, ∇y_logπy_exp)
         end
@@ -67,6 +69,7 @@ function test_constraint(
                 @inferred constrain(c, ty)
                 @inferred (y -> constrain_with_pushlogpdf(c, y)[1])(ty)
                 _, pushlogpdf = constrain_with_pushlogpdf(c, ty)
+                @inferred pushlogpdf(logπx)
                 @inferred pushlogpdf(logπx, ∇x_logπx)
             end
         end
