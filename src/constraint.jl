@@ -533,6 +533,8 @@ Merge adjacent constraints that can be merged. For example,
 """
 merge_constraints(c1, c2, cs...) = reduce(merge_constraints, (c1, c2, cs...))
 
+@inline merge_constraints(c1) = (c1,)
+
 @inline merge_constraints(c1, c2) = (c1, c2)
 
 @inline function merge_constraints(c1, c2::Tuple)
