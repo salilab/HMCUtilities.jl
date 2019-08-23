@@ -510,18 +510,48 @@ struct JointConstraint{TC,CR,CF,NC,NF} <: VariableConstraint{NC,NF}
     franges::CF
 
     function JointConstraint(constraints...)
-        ncs = map(constrain_dimension, constraints)
+        cs = merge_constraints(constraints...)
+
+        ncs = map(constrain_dimension, cs)
         nc = sum(ncs)
         cranges = _ranges_from_lengths(ncs)
 
-        nfs = map(free_dimension, constraints)
+        nfs = map(free_dimension, cs)
         nf = sum(nfs)
         franges = _ranges_from_lengths(nfs)
 
-        cs = tuple(constraints...)
-
         return new{typeof(cs),typeof(cranges),typeof(franges),nc,nf}(cs, cranges, franges)
     end
+end
+
+"""
+    merge_constraints(cs::VariableConstraint...)
+
+Merge adjacent constraints that can be merged. For example,
+`IdentityConstraint(3)` and `IdentityConstraint(2)` can be merged into a single
+`IdentityConstraint(5)`.
+"""
+merge_constraints(c1, c2, cs...) = reduce(merge_constraints, (c1, c2, cs...))
+
+@inline merge_constraints(c1, c2) = (c1, c2)
+
+@inline function merge_constraints(c1, c2::Tuple)
+    return (merge_constraints(c1, c2[1])..., Base.tail(c2)...)
+end
+
+@inline function merge_constraints(c1::Tuple, c2)
+    return (Base.front(c1)..., merge_constraints(c1[end], c2)...)
+end
+
+@inline function merge_constraints(c1::Tuple, c2::Tuple)
+    return (Base.front(c1)...,
+            merge_constraints(c1[end], c2[1])...,
+            Base.tail(c2)...)
+end
+
+@inline function merge_constraints(::IdentityConstraint{M},
+                                   ::IdentityConstraint{N}) where {M,N}
+    return (IdentityConstraint(M + N),)
 end
 
 function _ranges_from_lengths(lengths)

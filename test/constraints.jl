@@ -416,4 +416,20 @@ end
         cvtypes=vtypes,
         fvtypes=vtypes
     )
+
+    @testset "IdentityConstraint merged" begin
+        cs = [HMCUtilities.IdentityConstraint(3),
+              HMCUtilities.IdentityConstraint(2),
+              HMCUtilities.UpperBoundedConstraint(1.0),
+              HMCUtilities.IdentityConstraint(2),
+              HMCUtilities.IdentityConstraint(1)]
+        jc = HMCUtilities.JointConstraint(cs...)
+
+        cs2 = [HMCUtilities.IdentityConstraint(5),
+               HMCUtilities.UpperBoundedConstraint(1.0),
+               HMCUtilities.IdentityConstraint(3)]
+        jc2 = HMCUtilities.JointConstraint(cs...)
+
+        @test jc == jc2
+    end
 end
