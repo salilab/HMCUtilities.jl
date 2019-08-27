@@ -8,5 +8,6 @@ using Zygote
 using Einsum
 
 include("constraint.jl")
+include("advanced_hmc.jl")
 
 end # module
