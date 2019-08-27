@@ -524,6 +524,8 @@ struct JointConstraint{TC,CR,CF,NC,NF} <: VariableConstraint{NC,NF}
     end
 end
 
+JointConstraint(c) = c
+
 """
     merge_constraints(cs::VariableConstraint...)
 
