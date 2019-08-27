@@ -4,10 +4,12 @@ authors = ["Seth Axen <seth.axen@gmail.com>"]
 version = "0.1.0"
 
 [deps]
+AdvancedHMC = "0bf59076-c3b1-5ca4-86bd-e02cd72cde3d"
 DiffResults = "163ba53b-c6d8-5494-b064-1a9d43ac40c5"
 Einsum = "b7d42ee7-0b51-5a75-98ca-779d3107e4c0"
 ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 StatsFuns = "4c63d2b9-4356-54db-8cca-17b64c39e42c"
 Zygote = "e88e6eb3-aa80-5325-afca-941959d7151f"
 
