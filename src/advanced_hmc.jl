@@ -34,6 +34,8 @@ end
 
 make_phasepoint(h, q) = make_phasepoint(GLOBAL_RNG, h, q)
 
+position(z::PhasePoint) = z.θ
+
 step_size(i::AbstractIntegrator) = i.ϵ
 
 function sample(rng::AbstractRNG, h::Hamiltonian, τ::AbstractProposal, z::PhasePoint)
