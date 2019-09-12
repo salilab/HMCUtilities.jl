@@ -1,9 +1,3 @@
-# export AdvancedHMC:
-#     Hamiltonian,
-#     sample,
-#     update,
-#     refresh,
-#     transition
 export AdvancedHMC
 
 using Random:
