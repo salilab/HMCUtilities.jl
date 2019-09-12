@@ -14,12 +14,10 @@ using AdvancedHMC:
     Hamiltonian,
     AbstractProposal,
     AbstractIntegrator,
-    Adaptation,
     PhasePoint,
-    phasepoint,
     update,
-    refresh,
-    transition
+    sample_init,
+    step
 import AdvancedHMC: sample
 
 function update_metric(h::Hamiltonian, q::AbstractVector)
@@ -27,9 +25,8 @@ function update_metric(h::Hamiltonian, q::AbstractVector)
 end
 
 function make_phasepoint(rng::AbstractRNG, h::Hamiltonian, q::AbstractVector)
-    p = rand(rng, h.metric)
-    z = phasepoint(h, q, p)
-    return z
+    h, t = sample_init(rng, h, q)
+    return t.z
 end
 
 make_phasepoint(h, q) = make_phasepoint(GLOBAL_RNG, h, q)
@@ -39,9 +36,8 @@ position(z::PhasePoint) = z.θ
 step_size(i::AbstractIntegrator) = i.ϵ
 
 function sample(rng::AbstractRNG, h::Hamiltonian, τ::AbstractProposal, z::PhasePoint)
-    z = refresh(rng, z, h)
-    z, stat = transition(rng, τ, h, z)
-    return z, stat
+    t = step(rng, h, τ, z)
+    return t.z, t.stat
 end
 
 sample(h, τ, z) = sample(GLOBAL_RNG, h, τ, z)
