@@ -20,13 +20,14 @@ Abstract type for transformations on constrained variables represented with
 `NC`-dimensional vectors that produce `NF`-dimensional free (unconstrained)
 vectors.
 
-The supported interface is the 3 functions `constrain`, `free`, and
-`constrain_with_pushlogpdf`.
+The supported interface is the 4 functions `constrain`, `free`,
+`constrain_with_pushlogpdf` and `constrain_with_pushlogpdf_grad`.
 
 To implement a new constraint, simply create a new type of `VariableConstraint`
 and implement `constrain` and `free`. Various internal functions are used to
 provide efficient and accurate defaults; these may be overriden for increased
-efficiency when analytical gradients/jacobian determinants are known.
+efficiency when analytical gradients/jacobian determinants are known. The most
+common override is `constrain_with_logpdf_correction`.
 """
 abstract type VariableConstraint{NC,NF} end
 
@@ -89,7 +90,54 @@ Base.@propagate_inbounds function constrain(c::UnivariateConstraint,
 end
 
 """
+    constrain_with_logpdf_correction(c::VariableConstraint, y)
+
+From free variable `y = f(x)` get the constrained variable `x` and the
+addtive correction to the log density `log π(x)` to get `log π(x)`. See
+[`free_logpdf_correction`](@free_logpdf_correction).
+"""
+function constrain_with_logpdf_correction(c, y)
+    x = constrain(c, y)
+    logdetJ = free_logpdf_correction(c, y)
+    return x, logdetJ
+end
+
+Base.@propagate_inbounds function constrain_with_logpdf_correction(
+        c::UnivariateConstraint,
+        y::AbstractVector
+    )
+    x, logdetJ = constrain_with_logpdf_correction(c, y[1])
+    return [x], logdetJ
+end
+
+"""
     constrain_with_pushlogpdf(c::VariableConstraint, y)
+
+From free variable `y = f(x)` get the constrained variable `x` and a new
+function that pushes forward the log density `log π(x)` with respect to `x` and
+to the corresponding log density `log π(y)` with respect to `y`.
+
+```julia
+x, pushlogpdf = constrain_with_pushlogpdf(c, y)
+logπx = ... # Compute density in constrained space
+logπy = pushlogpdf(logπx)
+```
+"""
+function constrain_with_pushlogpdf(c, y)
+    x, logdetJ = constrain_with_logpdf_correction(c, y)
+    return x, logπx -> logπx + logdetJ
+end
+
+Base.@propagate_inbounds function constrain_with_pushlogpdf(
+        c::UnivariateConstraint,
+        y::AbstractVector
+    )
+    x, pushlogpdf = constrain_with_pushlogpdf(c, y[1])
+    return [x], pushlogpdf
+end
+
+"""
+    constrain_with_pushlogpdf_grad(c::VariableConstraint, y)
 
 From free variable `y = f(x)` get the constrained variable `x` and a new
 function that pushes forward the log density `log π(x)` with respect to `x` and
@@ -97,44 +145,32 @@ its gradient to the corresponding log density `log π(y)` with respect to `y` an
 its gradient.
 
 ```julia
-x, pushlogpdf = constrain_with_pushlogpdf(c, y)
+x, pushlogpdf_grad = constrain_with_pushlogpdf_grad(c, y)
 logπx, ∇x_logπx = ... # Compute density and its gradient in constrained space
-logπy, ∇y_logπy = pushlogpdf(logπx, ∇x_logπx)
+logπy, ∇y_logπy = pushlogpdf_grad(logπx, ∇x_logπx)
 ```
 """
-function constrain_with_pushlogpdf(c, y)
-    x, pushgrad = constrain_with_pushgrad(c, y)
+function constrain_with_pushlogpdf_grad(c, y)
+    (x, logdetJ), back = Zygote.forward(constrain_with_logpdf_correction, c, y)
 
-    function pushlogpdf(logπx)
-        logdetJ = free_logpdf_correction(c, y)
-        return logπx + logdetJ
-    end
-
-    function pushlogpdf(logπx, ∇x_logπx)
-        logdetJ, ∇y_logdetJ = free_logpdf_correction_with_grad(c, y)
-        ∇y_logπx = pushgrad(∇x_logπx)
+    return x, function (logπx, ∇x_logπx)
+        s = Zygote.sensitivity(logdetJ)
         logπy = logπx + logdetJ
-        ∇y_logπy = ∇y_logπx .+ ∇y_logdetJ
+        ∇y_logπy = back((∇x_logπx, s))[2]
         return logπy, ∇y_logπy
     end
-
-    return x, pushlogpdf
 end
 
-Base.@propagate_inbounds function constrain_with_pushlogpdf(
+Base.@propagate_inbounds function constrain_with_pushlogpdf_grad(
         c::UnivariateConstraint,
-        y::AbstractArray
+        y::AbstractVector
     )
-    x, scalar_push = constrain_with_pushlogpdf(c, y[1])
 
-    pushlogpdf(logπx) = scalar_push(logπx)
-
-    Base.@propagate_inbounds function pushlogpdf(logπx, ∇x_logπx::AbstractArray)
-        logπy, ∇y_logπy = scalar_push(logπx, ∇x_logπx[1])
+    x, pushlogpdf_grad = constrain_with_pushlogpdf_grad(c, y[1])
+    return [x], function (logπx, ∇x_logπx::AbstractVector)
+        logπy, ∇y_logπy = pushlogpdf_grad(logπx, ∇x_logπx[1])
         return logπy, [∇y_logπy]
     end
-
-    return [x], pushlogpdf
 end
 
 """
@@ -235,29 +271,11 @@ From free variable `y`, compute correction to log pdf for transformation. For
 a one-to-one transformation with a square Jacobian, the correction simplifies
 to `log |det J|`.
 """
-function free_logpdf_correction(c::OneToOneConstraint, y)
+function free_logpdf_correction(c::OneToOneConstraint, y::AbstractVector)
     J = constrain_jacobian(c, y)
-    return _logabsdet(J)
+    return first(logabsdet(J))
 end
 
-_format_grad(x, ∇x) = Zygote.accum(zero(x), ∇x)
-
-function free_logpdf_correction_with_grad(c, y)
-    logdetJ, back = Zygote.forward(free_logpdf_correction, c, y)
-
-    TY = typeof(y)
-    s = Zygote.sensitivity(logdetJ)  # 1
-    ∇y_logdetJ::TY = _format_grad(y, back(s)[2])
-    T = eltype(y)
-
-    return logdetJ::T, ∇y_logdetJ
-end
-
-function constrain_with_pushgrad(c, y)
-    x, back = Zygote.forward(constrain, c, y)
-
-    return x, ∇x -> _format_grad(y, back(∇x)[2])
-end
 
 ###
 ### Constraint implementations
@@ -289,16 +307,18 @@ free(::IdentityConstraint, x::AbstractVector) = x
 constrain(::IdentityConstraint, y) = y
 constrain(::IdentityConstraint, y::AbstractVector) = y
 
-function constrain_with_pushlogpdf(::IdentityConstraint, y)
-    pushlogpdf(logπx) = logπx
-    pushlogpdf(logπx, ∇x_logπx) = (logπx, ∇x_logπx)
-    return y, pushlogpdf
+free_logpdf_correction(::IdentityConstraint, y) = zero(eltype(y))
+free_logpdf_correction(::IdentityConstraint, y::AbstractVector) = zero(eltype(y))
+
+constrain_with_pushlogpdf(::IdentityConstraint, y) = y, identity
+constrain_with_pushlogpdf(::IdentityConstraint, y::AbstractVector) = y, identity
+
+function constrain_with_pushlogpdf_grad(::IdentityConstraint, y)
+    return y, (logπx, ∇x_logπx) -> (logπx, ∇x_logπx)
 end
 
-function constrain_with_pushlogpdf(::IdentityConstraint{1}, y::AbstractVector)
-    pushlogpdf(logπx) = logπx
-    pushlogpdf(logπx, ∇x_logπx) = (logπx, ∇x_logπx)
-    return y, pushlogpdf
+function constrain_with_pushlogpdf_grad(::IdentityConstraint, y::AbstractVector)
+    return y, (logπx, ∇x_logπx) -> (logπx, ∇x_logπx)
 end
 
 
@@ -323,15 +343,7 @@ free(c::LowerBoundedConstraint, x::Real) = log(x - c.lb)
 
 constrain(c::LowerBoundedConstraint, y::Real) = exp(y) + c.lb
 
-function constrain_with_pushlogpdf(c::LowerBoundedConstraint, y::Real)
-    expy = exp(y)
-    x = expy + c.lb
-
-    pushlogpdf(logπx) = logπx + y
-    pushlogpdf(logπx, dx_logπx::Real) = (logπx + y, dx_logπx * expy + 1)
-
-    return x, pushlogpdf
-end
+free_logpdf_correction(c::LowerBoundedConstraint, y::Real) = y
 
 
 """
@@ -355,15 +367,7 @@ free(c::UpperBoundedConstraint, x::Real) = log(c.ub - x)
 
 constrain(c::UpperBoundedConstraint, y::Real) = c.ub - exp(y)
 
-function constrain_with_pushlogpdf(c::UpperBoundedConstraint, y::Real)
-    nexpy = -exp(y)
-    x = nexpy + c.ub
-
-    pushlogpdf(logπx) = logπx + y
-    pushlogpdf(logπx, dx_logπx::Real) = (logπx + y, dx_logπx * nexpy + 1)
-
-    return x, pushlogpdf
-end
+free_logpdf_correction(c::UpperBoundedConstraint, y::Real) = y
 
 
 """
@@ -394,21 +398,12 @@ free(c::BoundedConstraint, x::Real) = logit((x - c.lb) / c.delta)
 
 constrain(c::BoundedConstraint, y::Real) = c.delta * logistic(y) + c.lb
 
-# Avoid recalculating logistic
-function constrain_with_pushlogpdf(c::BoundedConstraint, y::Real)
+function constrain_with_logpdf_correction(c::BoundedConstraint, y::Real)
     z = logistic(y)
     delz = c.delta * z
     x = delz + c.lb
     dx_dy = delz * (1 - z)
-    dy_logdetJ = 1 - 2z
-
-    pushlogpdf(logπx) = logπx + log(dx_dy)
-
-    function pushlogpdf(logπx, dx_logπx::Real)
-        return (logπx + log(dx_dy), dx_logπx * dx_dy + dy_logdetJ)
-    end
-
-    return x, pushlogpdf
+    return x, log(dx_dy)
 end
 
 
@@ -465,31 +460,34 @@ function Base.show(io::IO, mime::MIME"text/plain",
 end
 
 function free(::UnitVectorConstraint, x)
-    snx = dot(x, x)
-    @assert snx ≈ 1
+    nx = norm(x)
+    @assert nx ≈ 1 "Expected norm of 1 for vector $x with norm $nx."
     return x
 end
 
-constrain(::UnitVectorConstraint, y) = y ./ norm(y)
+function constrain(::UnitVectorConstraint, y)
+    x = y ./ norm(y)
+    @assert norm(x) ≈ 1 "Expected norm of 1 for vector $x with norm $(norm(x))."
+    return x
+end
 
-# Avoid re-normalizing
-function constrain_with_pushlogpdf(::UnitVectorConstraint, y)
+function normalize_with_norm(y)
     ny = norm(y)
-    x = y ./ ny
-    pushgrad = Δ -> Δ .- x .* (dot(x, Δ) + ny)
+    return y ./ ny, ny
+end
 
-    function pushlogpdf(logπx)
-        logdetJ = -ny^2 / 2
-        return logπx + logdetJ
+Zygote.@adjoint function normalize_with_norm(y)
+    x, ny = normalize_with_norm(y)
+    return (x, ny), function (Δ)
+        x̄, n̄ȳ = Δ
+        return (x̄ ./ ny .- x .* (dot(x, x̄) / ny - n̄ȳ),)
     end
+end
 
-    function pushlogpdf(logπx, ∇x_logπx)
-        logdetJ = -ny^2 / 2
-        ∇y_logπy = pushgrad(∇x_logπx ./ ny)
-        return logπx + logdetJ, ∇y_logπy
-    end
-
-    return x, pushlogpdf
+function constrain_with_logpdf_correction(::UnitVectorConstraint, y)
+    x, ny = normalize_with_norm(y)
+    logdetJ = -ny^2 / 2
+    return x, logdetJ
 end
 
 
@@ -631,17 +629,88 @@ function constrain(jc::JointConstraint, y)
     )
 end
 
+function _parallel_constrain_with_logpdf_correction(cs, cranges, franges, nc, nf, y)
+    x = similar(y, nc)
+
+    TL = eltype(y)
+    cinds = 1:length(cs)
+
+    logdetJ = zero(TL)
+    @simd for i in cinds
+        @inbounds begin
+            yᵢ = view(y, franges[i])
+            xᵢ, logdetJᵢ = constrain_with_logpdf_correction(cs[i], yᵢ)
+            setindex!(x, xᵢ, cranges[i])
+        end
+        logdetJ += logdetJᵢ
+    end
+
+    return x, logdetJ
+end
+
+Zygote.@adjoint function _parallel_constrain_with_logpdf_correction(cs, cranges, franges, nc, nf, y)
+    x = similar(y, nc)
+
+    TL = eltype(y)
+    cinds = 1:length(cs)
+
+    backs = []
+    logdetJ = zero(TL)
+    @simd for i in cinds
+        @inbounds begin
+            yᵢ = view(y, franges[i])
+            (xᵢ, logdetJᵢ), backᵢ = (
+                Zygote.forward(constrain_with_logpdf_correction, cs[i], yᵢ)
+            )
+            setindex!(x, xᵢ, cranges[i])
+        end
+        push!(backs, backᵢ)
+        logdetJ += logdetJᵢ
+    end
+
+    return (x, logdetJ), function (Δ)
+        x̄, logdetJ̄ = Δ
+        TA = Base.promote_eltypeof(x̄, logdetJ̄)
+        ȳ = similar(x̄, TA, nf)
+
+        @simd for i in cinds
+            @inbounds begin
+                x̄ᵢ = view(x̄, cranges[i])
+                backᵢ = backs[i]
+                ȳᵢ = backᵢ((x̄ᵢ, logdetJ̄))[2]
+                setindex!(ȳ, ȳᵢ, franges[i])
+            end
+        end
+
+        return (nothing, nothing, nothing, nothing, nothing, ȳ)
+    end
+end
+
+function constrain_with_logpdf_correction(jc::JointConstraint, y)
+    nf = free_dimension(jc)
+    @assert length(y) == nf
+    return _parallel_constrain_with_logpdf_correction(
+        jc.constraints,
+        jc.cranges,
+        jc.franges,
+        constrain_dimension(jc),
+        nf,
+        y
+    )
+end
+
 function _parallel_constrain_with_pushlogpdf(cs, cranges, franges, nc, nf, y)
     x = similar(y, nc)
-    pushlogpdfs = []
+    pushes = []
     cinds = 1:length(cs)
+    logdetJs = []
     @simd for i in cinds
         @inbounds begin
             yᵢ = view(y, franges[i])
             xᵢ, pushᵢ = constrain_with_pushlogpdf(cs[i], yᵢ)::Tuple
             setindex!(x, xᵢ, cranges[i])
         end
-        push!(pushlogpdfs, pushᵢ)
+        push!(pushes, pushᵢ)
     end
     y1 = @inbounds y[1]
 
@@ -650,8 +719,8 @@ function _parallel_constrain_with_pushlogpdf(cs, cranges, franges, nc, nf, y)
 
         logdetJ = zero(TL)
         @simd for i in cinds
-            pushᵢ = pushlogpdfs[i]
-            logdetJᵢ = pushᵢ(zero(logπx))
+            @inbounds pushᵢ = pushes[i]
+            logdetJᵢ = pushᵢ(zero(TL))
             logdetJ += logdetJᵢ
         end
 
@@ -659,7 +728,36 @@ function _parallel_constrain_with_pushlogpdf(cs, cranges, franges, nc, nf, y)
         return logπy
     end
 
-    function pushlogpdf(logπx, ∇x_logπx)
+    return x, pushlogpdf
+end
+
+function constrain_with_pushlogpdf(jc::JointConstraint, y)
+    @assert length(y) == free_dimension(jc)
+    return _parallel_constrain_with_pushlogpdf(
+        jc.constraints,
+        jc.cranges,
+        jc.franges,
+        free_dimension(jc),
+        constrain_dimension(jc),
+        y
+    )
+end
+
+function _parallel_constrain_with_pushlogpdf_grad(cs, cranges, franges, nc, nf, y)
+    x = similar(y, nc)
+    pushes = []
+    cinds = 1:length(cs)
+    @simd for i in cinds
+        @inbounds begin
+            yᵢ = view(y, franges[i])
+            xᵢ, pushᵢ = constrain_with_pushlogpdf_grad(cs[i], yᵢ)::Tuple
+            setindex!(x, xᵢ, cranges[i])
+        end
+        push!(pushes, pushᵢ)
+    end
+    y1 = @inbounds y[1]
+
+    function pushlogpdf_grad(logπx, ∇x_logπx)
         TL = Base.promote_eltypeof(y1, logπx, ∇x_logπx)
         ∇y_logπy = similar(∇x_logπx, nf)
 
@@ -667,7 +765,7 @@ function _parallel_constrain_with_pushlogpdf(cs, cranges, franges, nc, nf, y)
         @simd for i in cinds
             @inbounds begin
                 ∇x_logπxᵢ = view(∇x_logπx, cranges[i])
-                pushᵢ = pushlogpdfs[i]
+                pushᵢ = pushes[i]
                 logdetJᵢ, ∇y_logπyᵢ = pushᵢ(zero(logπx), ∇x_logπxᵢ)::Tuple
                 setindex!(∇y_logπy, ∇y_logπyᵢ, franges[i])
             end
@@ -678,12 +776,12 @@ function _parallel_constrain_with_pushlogpdf(cs, cranges, franges, nc, nf, y)
         return logπy, ∇y_logπy
     end
 
-    return x, pushlogpdf
+    return x, pushlogpdf_grad
 end
 
-function constrain_with_pushlogpdf(jc::JointConstraint, y)
+function constrain_with_pushlogpdf_grad(jc::JointConstraint, y)
     @assert length(y) == free_dimension(jc)
-    return _parallel_constrain_with_pushlogpdf(
+    return _parallel_constrain_with_pushlogpdf_grad(
         jc.constraints,
         jc.cranges,
         jc.franges,

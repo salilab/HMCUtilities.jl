@@ -1,6 +1,9 @@
 module HMCUtilities
 
-export free, constrain, constrain_with_pushlogpdf
+export free,
+    constrain,
+    constrain_with_pushlogpdf,
+    constrain_with_pushlogpdf_grad
 
 using ForwardDiff
 using DiffResults

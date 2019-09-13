@@ -65,7 +65,8 @@ HMCUtilities.free(c::TestSquareConstraint, x::Real) = sqrt(x)
                 ∇x_logπx,
                 y_exp,
                 logπy_exp,
-                ∇y_logπy_exp
+                ∇y_logπy_exp,
+                test_type_stability = false
             )
         end
     end
@@ -89,7 +90,8 @@ HMCUtilities.free(c::TestSquareConstraint, x::Real) = sqrt(x)
                 ∇x_logπx,
                 y_exp,
                 logπy_exp,
-                ∇y_logπy_exp
+                ∇y_logπy_exp,
+                test_type_stability = false
             )
         end
     end
@@ -116,7 +118,8 @@ HMCUtilities.free(c::TestSquareConstraint, x::Real) = sqrt(x)
                 logπy_exp,
                 ∇y_logπy_exp;
                 cvtypes=vtypes,
-                fvtypes=vtypes
+                fvtypes=vtypes,
+                test_type_stability = false
             )
         end
 
@@ -132,7 +135,8 @@ HMCUtilities.free(c::TestSquareConstraint, x::Real) = sqrt(x)
                 logπy_exp,
                 [∇y_logπy_exp];
                 cvtypes=vtypes,
-                fvtypes=vtypes
+                fvtypes=vtypes,
+                test_type_stability = false
             )
         end
     end
@@ -391,8 +395,8 @@ end
         xi = constrain(c, yi)
         yi_exp = free(c, xi)
         ∇x_logπxi = randn(length(xi))
-        _, pushlogpdf = constrain_with_pushlogpdf(c, yi)
-        logdetJi, ∇y_logπyi = pushlogpdf(0.0, ∇x_logπxi)
+        _, pushlogpdf_grad = constrain_with_pushlogpdf_grad(c, yi)
+        logdetJi, ∇y_logπyi = pushlogpdf_grad(0.0, ∇x_logπxi)
         push!(y, yi...)
         push!(x, xi...)
         push!(y_exp, yi_exp...)

@@ -5,7 +5,8 @@ using HMCUtilities:
     constrain_dimension,
     free,
     constrain,
-    constrain_with_pushlogpdf
+    constrain_with_pushlogpdf,
+    constrain_with_pushlogpdf_grad
 
 _size(x) = size(x)
 _size(x::Number) = (length(x),)
@@ -51,8 +52,14 @@ function test_constraint(
             logπy = pushlogpdf(logπx)
             @test isreal(logπy)
             @test logπy ≈ convert(eltype(FVType), logπy_exp)
-            logπy2, ∇y_logπy = pushlogpdf(logπx, ∇x_logπx)
-            @test logπy2 ≈ logπy
+        end
+
+        @testset "constrain_with_pushlogpdf_grad" begin
+            x2, pushlogpdf_grad = constrain_with_pushlogpdf_grad(c, ty)
+            @test x2 ≈ constrain(c, ty)
+            logπy, ∇y_logπy = pushlogpdf_grad(logπx, ∇x_logπx)
+            @test isreal(logπy)
+            @test logπy ≈ convert(eltype(FVType), logπy_exp)
             @test _size(∇y_logπy) == (free_dimension(c),)
             @test ∇y_logπy ≈ convert(FVType, ∇y_logπy_exp)
         end
@@ -67,10 +74,14 @@ function test_constraint(
             @testset "type stability" begin
                 @inferred free(c, tx)
                 @inferred constrain(c, ty)
+
                 @inferred (y -> constrain_with_pushlogpdf(c, y)[1])(ty)
                 _, pushlogpdf = constrain_with_pushlogpdf(c, ty)
                 @inferred pushlogpdf(logπx)
-                @inferred pushlogpdf(logπx, ∇x_logπx)
+
+                @inferred (y -> constrain_with_pushlogpdf_grad(c, y)[1])(ty)
+                _, pushlogpdf_grad = constrain_with_pushlogpdf_grad(c, ty)
+                @inferred pushlogpdf_grad(logπx, ∇x_logπx)
             end
         end
     end
