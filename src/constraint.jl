@@ -413,7 +413,7 @@ function BoundedConstraint(lb::Real, ub::Real)
     return BoundedConstraint(lb, ub, ub - lb)
 end
 
-clamp(c::BoundedConstraint, x::Real) = max(min(x, c.ub - eps(x)), c.lb + eps(x))
+clamp(c::BoundedConstraint, x::Real) = clamp(x, c.lb + eps(x), c.ub - eps(x))
 
 free(c::BoundedConstraint, x::Real) = logit((clamp(c, x) - c.lb) / c.delta)
 
