@@ -198,6 +198,10 @@ end
             cvtypes=vtypes,
             fvtypes=vtypes
         )
+
+        @testset "clamp" begin
+            @test constrain(c, -Inf) ≈ -5 + eps()
+        end
     end
 
     @testset "lb=5, y=-5" begin
@@ -217,6 +221,10 @@ end
             cvtypes=vtypes,
             fvtypes=vtypes
         )
+
+        @testset "clamp" begin
+            @test constrain(c, -Inf) ≈ 5 + eps()
+        end
     end
 end
 
@@ -239,6 +247,13 @@ end
             cvtypes=vtypes,
             fvtypes=vtypes
         )
+
+        @testset "clamp" begin
+            xbound = -5 - eps()
+            @test constrain(c, -Inf) ≈ xbound
+            @test constrain_with_pushlogpdf(c, -Inf)[1] ≈ xbound
+            @test constrain_with_pushlogpdf_grad(c, -Inf)[1] ≈ xbound
+        end
     end
 
     @testset "ub=5, y=-5" begin
@@ -258,6 +273,13 @@ end
             cvtypes=vtypes,
             fvtypes=vtypes
         )
+
+        @testset "clamp" begin
+            xbound = 5 - eps()
+            @test constrain(c, -Inf) ≈ xbound
+            @test constrain_with_pushlogpdf(c, -Inf)[1] ≈ xbound
+            @test constrain_with_pushlogpdf_grad(c, -Inf)[1] ≈ xbound
+        end
     end
 end
 
@@ -301,6 +323,18 @@ end
                 fvtypes=vtypes
             )
         end
+
+        @testset "clamp" begin
+            xbound = 0 + eps()
+            @test isapprox(constrain(c, -Inf), xbound, atol=1e-12)
+            @test isapprox(constrain_with_pushlogpdf(c, -Inf)[1], xbound, atol=1e-12)
+            @test isapprox(constrain_with_pushlogpdf_grad(c, -Inf)[1], xbound, atol=1e-12)
+
+            xbound = 1 - eps()
+            @test isapprox(constrain(c, Inf), xbound, atol=1e-12)
+            @test isapprox(constrain_with_pushlogpdf(c, Inf)[1], xbound, atol=1e-12)
+            @test isapprox(constrain_with_pushlogpdf_grad(c, Inf)[1], xbound, atol=1e-12)
+        end
     end
 
     @testset "lb=-5, ub=5" begin
@@ -322,6 +356,18 @@ end
                 fvtypes=vtypes
             )
 
+        end
+
+        @testset "clamp" begin
+            xbound = -5 + eps()
+            @test constrain(c, -Inf) ≈ xbound
+            @test constrain_with_pushlogpdf(c, -Inf)[1] ≈ xbound
+            @test constrain_with_pushlogpdf_grad(c, -Inf)[1] ≈ xbound
+
+            xbound = 5 - eps()
+            @test constrain(c, Inf) ≈ xbound
+            @test constrain_with_pushlogpdf(c, Inf)[1] ≈ xbound
+            @test constrain_with_pushlogpdf_grad(c, Inf)[1] ≈ xbound
         end
     end
 end
@@ -372,6 +418,13 @@ end
             cvtypes=vtypes,
             fvtypes=vtypes
         )
+
+        @testset "clamp" begin
+            xbound = normalize(y)
+            @test constrain(c, y) ≈ xbound
+            @test constrain_with_pushlogpdf(c, y)[1] ≈ xbound
+            @test constrain_with_pushlogpdf_grad(c, y)[1] ≈ xbound
+        end
     end
 end
 

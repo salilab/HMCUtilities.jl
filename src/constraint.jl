@@ -2,7 +2,8 @@
 # Constraint interface and implementations
 #
 
-import Base: show
+import Base: clamp,
+    show
 using LinearAlgebra:
     dot,
     norm,
@@ -64,6 +65,18 @@ free_dimension(::VariableConstraint{NC,NF}) where {NC,NF} = NF
 Get the number of dimensions (length) of the constrained vector.
 """
 constrain_dimension(::VariableConstraint{NC}) where {NC} = NC
+
+"""
+    clamp(c::VariableConstraint, x)
+
+Return `x`, ensuring that its value satisfies the constraint. This is useful
+to avoid numerical instability when a value nears the boundary condition.
+The clamp is invisible during differentiation.
+"""
+function clamp end
+
+# Passthrough adjoints for clamp
+Zygote.@adjoint clamp(c::VariableConstraint, x) = clamp(c, x), Δ -> (nothing, Δ)
 
 """
     free(c::VariableConstraint, x)
@@ -301,6 +314,8 @@ function Base.show(io::IO, mime::MIME"text/plain",
     print(io, "IdentityConstraint($N)")
 end
 
+clamp(::IdentityConstraint, x) = x
+
 free(::IdentityConstraint, x) = x
 free(::IdentityConstraint, x::AbstractVector) = x
 
@@ -339,9 +354,11 @@ function Base.show(io::IO, mime::MIME"text/plain", c::LowerBoundedConstraint)
     print(io, "LowerBoundedConstraint($(c.lb))")
 end
 
-free(c::LowerBoundedConstraint, x::Real) = log(x - c.lb)
+clamp(c::LowerBoundedConstraint, x::Real) = max(x, c.lb + eps(x))
 
-constrain(c::LowerBoundedConstraint, y::Real) = exp(y) + c.lb
+free(c::LowerBoundedConstraint, x::Real) = log(clamp(c, x) - c.lb)
+
+constrain(c::LowerBoundedConstraint, y::Real) = clamp(c, exp(y) + c.lb)
 
 free_logpdf_correction(c::LowerBoundedConstraint, y::Real) = y
 
@@ -363,9 +380,11 @@ function Base.show(io::IO, mime::MIME"text/plain", c::UpperBoundedConstraint)
     print(io, "UpperBoundedConstraint($(c.ub))")
 end
 
-free(c::UpperBoundedConstraint, x::Real) = log(c.ub - x)
+clamp(c::UpperBoundedConstraint, x::Real) = min(x, c.ub - eps(x))
 
-constrain(c::UpperBoundedConstraint, y::Real) = c.ub - exp(y)
+free(c::UpperBoundedConstraint, x::Real) = log(c.ub - clamp(c, x))
+
+constrain(c::UpperBoundedConstraint, y::Real) = clamp(c, c.ub - exp(y))
 
 free_logpdf_correction(c::UpperBoundedConstraint, y::Real) = y
 
@@ -394,16 +413,18 @@ function BoundedConstraint(lb::Real, ub::Real)
     return BoundedConstraint(lb, ub, ub - lb)
 end
 
-free(c::BoundedConstraint, x::Real) = logit((x - c.lb) / c.delta)
+clamp(c::BoundedConstraint, x::Real) = max(min(x, c.ub - eps(x)), c.lb + eps(x))
 
-constrain(c::BoundedConstraint, y::Real) = c.delta * logistic(y) + c.lb
+free(c::BoundedConstraint, x::Real) = logit((clamp(c, x) - c.lb) / c.delta)
+
+constrain(c::BoundedConstraint, y::Real) = clamp(c, c.delta * logistic(y) + c.lb)
 
 function constrain_with_logpdf_correction(c::BoundedConstraint, y::Real)
     z = logistic(y)
     delz = c.delta * z
     x = delz + c.lb
     dx_dy = delz * (1 - z)
-    return x, log(dx_dy)
+    return clamp(c, x), log(dx_dy)
 end
 
 
@@ -459,15 +480,12 @@ function Base.show(io::IO, mime::MIME"text/plain",
     print(io, "UnitVectorConstraint($N)")
 end
 
-function free(::UnitVectorConstraint, x)
-    nx = norm(x)
-    @assert nx ≈ 1 "Expected norm of 1 for vector $x with norm $nx."
-    return x
-end
+clamp(c::UnitVectorConstraint, x) = normalize(x)
+
+free(c::UnitVectorConstraint, x) = clamp(c, x)
 
 function constrain(::UnitVectorConstraint, y)
     x = y ./ norm(y)
-    @assert norm(x) ≈ 1 "Expected norm of 1 for vector $x with norm $(norm(x))."
     return x
 end
 
