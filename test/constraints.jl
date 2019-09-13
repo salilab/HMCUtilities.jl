@@ -416,7 +416,8 @@ end
             logπy_exp,
             ∇y_logπy_exp;
             cvtypes=vtypes,
-            fvtypes=vtypes
+            fvtypes=vtypes,
+            test_logdetJ_consistency = false
         )
 
         @testset "clamp" begin
@@ -471,7 +472,8 @@ end
         logπy_exp,
         ∇y_logπy_exp;
         cvtypes=vtypes,
-        fvtypes=vtypes
+        fvtypes=vtypes,
+        test_logdetJ_consistency = false
     )
 
     @testset "IdentityConstraint merged" begin

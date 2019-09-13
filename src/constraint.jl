@@ -315,6 +315,7 @@ function Base.show(io::IO, mime::MIME"text/plain",
 end
 
 clamp(::IdentityConstraint, x) = x
+clamp(::IdentityConstraint, x::ForwardDiff.Dual) = x
 
 free(::IdentityConstraint, x) = x
 free(::IdentityConstraint, x::AbstractVector) = x
@@ -355,6 +356,7 @@ function Base.show(io::IO, mime::MIME"text/plain", c::LowerBoundedConstraint)
 end
 
 clamp(c::LowerBoundedConstraint, x::Real) = max(x, c.lb + eps(x))
+clamp(::LowerBoundedConstraint, x::ForwardDiff.Dual) = x
 
 free(c::LowerBoundedConstraint, x::Real) = log(clamp(c, x) - c.lb)
 
@@ -381,6 +383,7 @@ function Base.show(io::IO, mime::MIME"text/plain", c::UpperBoundedConstraint)
 end
 
 clamp(c::UpperBoundedConstraint, x::Real) = min(x, c.ub - eps(x))
+clamp(::UpperBoundedConstraint, x::ForwardDiff.Dual) = x
 
 free(c::UpperBoundedConstraint, x::Real) = log(c.ub - clamp(c, x))
 
@@ -414,6 +417,7 @@ function BoundedConstraint(lb::Real, ub::Real)
 end
 
 clamp(c::BoundedConstraint, x::Real) = clamp(x, c.lb + eps(x), c.ub - eps(x))
+clamp(::BoundedConstraint, x::ForwardDiff.Dual) = x
 
 free(c::BoundedConstraint, x::Real) = logit((clamp(c, x) - c.lb) / c.delta)
 
@@ -480,7 +484,8 @@ function Base.show(io::IO, mime::MIME"text/plain",
     print(io, "UnitVectorConstraint($N)")
 end
 
-clamp(c::UnitVectorConstraint, x) = normalize(x)
+clamp(::UnitVectorConstraint, x) = normalize(x)
+clamp(::UnitVectorConstraint, x::AbstractArray{<:ForwardDiff.Dual}) = x
 
 free(c::UnitVectorConstraint, x) = clamp(c, x)
 

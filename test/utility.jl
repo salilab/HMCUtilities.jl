@@ -6,10 +6,18 @@ using HMCUtilities:
     free,
     constrain,
     constrain_with_pushlogpdf,
-    constrain_with_pushlogpdf_grad
+    constrain_with_pushlogpdf_grad,
+    _logabsdet
 
 _size(x) = size(x)
 _size(x::Number) = (length(x),)
+
+function logabsdetjac(c, y)
+    J = HMCUtilities.constrain_jacobian(c, y)
+    return _logabsdet(J'J)[1] / 2
+end
+
+_format_grad(z, x) = Zygote.accum(z, x)
 
 function test_constraint(
         c,
@@ -22,7 +30,8 @@ function test_constraint(
         ∇y_logπy_exp;
         cvtypes=[Vector{Float64}, Vector{Float32}],
         fvtypes=[Vector{Float64}, Vector{Float32}],
-        test_type_stability = true
+        test_type_stability = true,
+        test_logdetJ_consistency = true
     )
     @test isa(c, VariableConstraint)
 
@@ -68,6 +77,20 @@ function test_constraint(
             J = HMCUtilities.constrain_jacobian(c, ty)
             J2, back = Zygote.forward(HMCUtilities.constrain_jacobian, c, ty)
             @test J ≈ J2
+        end
+
+        if test_logdetJ_consistency
+            @testset "logabsdet jacobian consistency" begin
+                logdetJ = logabsdetjac(c, ty)
+                _, pushlogpdf = constrain_with_pushlogpdf(c, ty)
+                @test logdetJ ≈ pushlogpdf(zero(logπx))
+
+                ∇y_logdetJ = _format_grad(zero(∇y_logπy_exp), Zygote.gradient(logabsdetjac, c, ty)[2])
+                _, pushlogpdf_grad = constrain_with_pushlogpdf_grad(c, ty)
+                logdetJ2, ∇y_logdetJ2 = pushlogpdf_grad(zero(logπx), zero(∇x_logπx))
+                @test logdetJ ≈ logdetJ2
+                @test ∇y_logdetJ ≈ ∇y_logdetJ2
+            end
         end
 
         if test_type_stability
