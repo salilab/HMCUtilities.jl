@@ -165,8 +165,22 @@ logπy, ∇y_logπy = pushlogpdf_grad(logπx, ∇x_logπx)
 """
 function constrain_with_pushlogpdf_grad(c, y)
     (x, logdetJ), back = Zygote.forward(constrain_with_logpdf_correction, c, y)
+    nf = free_dimension(c)
 
     return x, function (logπx, ∇x_logπx)
+        s = Zygote.sensitivity(logdetJ)
+        logπy = logπx + logdetJ
+        T = eltype(logπy)
+        ∇y_logπy = similar(∇x_logπx, T, nf)
+        copy!(∇y_logπy, back((∇x_logπx, s))[2])
+        return logπy, ∇y_logπy
+    end
+end
+
+function constrain_with_pushlogpdf_grad(c::UnivariateConstraint, y::Real)
+    (x, logdetJ), back = Zygote.forward(constrain_with_logpdf_correction, c, y)
+
+    return x, function (logπx, ∇x_logπx::Real)
         s = Zygote.sensitivity(logdetJ)
         logπy = logπx + logdetJ
         ∇y_logπy = back((∇x_logπx, s))[2]
@@ -178,7 +192,6 @@ Base.@propagate_inbounds function constrain_with_pushlogpdf_grad(
         c::UnivariateConstraint,
         y::AbstractVector
     )
-
     x, pushlogpdf_grad = constrain_with_pushlogpdf_grad(c, y[1])
     return [x], function (logπx, ∇x_logπx::AbstractVector)
         logπy, ∇y_logπy = pushlogpdf_grad(logπx, ∇x_logπx[1])
