@@ -545,6 +545,11 @@ struct UnitSimplexConstraint{N,M} <: VariableConstraint{N,M} end
 
 UnitSimplexConstraint(n::Int) = UnitSimplexConstraint{n,n-1}()
 
+function Base.show(io::IO, mime::MIME"text/plain",
+                   c::UnitSimplexConstraint{N}) where {N}
+    print(io, "UnitSimplexConstraint($N)")
+end
+
 """
     stick_ratio(x, Σx)
 
