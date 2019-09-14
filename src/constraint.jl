@@ -317,19 +317,19 @@ end
 clamp(::IdentityConstraint, x) = x
 clamp(::IdentityConstraint, x::ForwardDiff.Dual) = x
 
-free(::IdentityConstraint, x) = x
+free(::IdentityConstraint{1}, x::Real) = x
 free(::IdentityConstraint, x::AbstractVector) = x
 
-constrain(::IdentityConstraint, y) = y
+constrain(::IdentityConstraint{1}, y::Real) = y
 constrain(::IdentityConstraint, y::AbstractVector) = y
 
-free_logpdf_correction(::IdentityConstraint, y) = zero(eltype(y))
+free_logpdf_correction(::IdentityConstraint{1}, y::Real) = zero(eltype(y))
 free_logpdf_correction(::IdentityConstraint, y::AbstractVector) = zero(eltype(y))
 
-constrain_with_pushlogpdf(::IdentityConstraint, y) = y, identity
+constrain_with_pushlogpdf(::IdentityConstraint{1}, y::Real) = y, identity
 constrain_with_pushlogpdf(::IdentityConstraint, y::AbstractVector) = y, identity
 
-function constrain_with_pushlogpdf_grad(::IdentityConstraint, y)
+function constrain_with_pushlogpdf_grad(::IdentityConstraint{1}, y::Real)
     return y, (logπx, ∇x_logπx) -> (logπx, ∇x_logπx)
 end
 
