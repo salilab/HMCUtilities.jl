@@ -429,6 +429,94 @@ end
     end
 end
 
+@testset "UnitSimplexConstraint" begin
+    vtypes = [Vector{Float64}, Vector{Float32}]
+
+    ys = (
+        [-log(2)],
+        [-log(2), log(2)],
+        [-log(2), 0.0, log(2)]
+    )
+
+    xs = (
+        [1/3, 2/3],
+        [1/5, 8/15, 4/15],
+        [1/7, 2/7, 8/21, 4/21]
+    )
+
+    Js = (
+        [2/9, -2/9],
+        [4/25 0.0; -8/75 8/45; -4/75 -8/45],
+        [6/49 0.0 0.0;
+        -2/49 4/21 0.0;
+        -8/147 -8/63 8/63;
+        -4/147 -4/63 -8/63]
+    )
+
+    ∇y_logdetJs = (
+        [1/3],
+        [2/5, -1/3],
+        [3/7, 0.0, -1/3]
+    )
+
+    @testset "n=$n" for n in 2:4
+        vtypes = [Vector{Float64}, Vector{Float32}]
+
+        c = HMCUtilities.UnitSimplexConstraint(n)
+        alpha = rand(n)
+
+        x = xs[n - 1]
+        y = ys[n - 1]
+        J = Js[n - 1]
+        ∇y_logdetJ = ∇y_logdetJs[n - 1]
+
+        logπx, back = Zygote.forward(x -> sum((alpha .- 1) .* log.(x)), x)
+        ∇x_logπx = back(1.0)[1]
+
+        logdetJ = _logabsdet(J'J)[1] / 2
+
+        logπy_exp = logπx + logdetJ
+        ∇y_logπy_exp = J' * ∇x_logπx .+ ∇y_logdetJ
+
+        test_constraint(
+            c,
+            x,
+            y,
+            logπx,
+            ∇x_logπx,
+            y,
+            logπy_exp,
+            ∇y_logπy_exp;
+            cvtypes=vtypes,
+            fvtypes=vtypes
+        )
+
+        @testset "clamp" begin
+            y = [-Inf, randn(n-2)...]
+            xbound = constrain(c, y)
+            @test isapprox(xbound[1], eps(); atol=1e-16)
+            xbound = constrain_with_pushlogpdf(c, y)[1]
+            @test isapprox(xbound[1], eps(); atol=1e-16)
+            xbound = constrain_with_pushlogpdf_grad(c, y)[1]
+            @test isapprox(xbound[1], eps(); atol=1e-16)
+
+            y = [Inf, randn(n-2)...]
+            xbound = constrain(c, y)
+            @test xbound ≈ [1 - eps(), eps() * ones(n-1)...]
+            @test xbound[1] < 1
+            @test all(xbound[2:end] .> 0)
+            xbound = constrain_with_pushlogpdf(c, y)[1]
+            @test xbound ≈ [1 - eps(), eps() * ones(n-1)...]
+            @test xbound[1] < 1
+            @test all(xbound[2:end] .> 0)
+            xbound = constrain_with_pushlogpdf_grad(c, y)[1]
+            @test xbound ≈ [1 - eps(), eps() * ones(n-1)...]
+            @test xbound[1] < 1
+            @test all(xbound[2:end] .> 0)
+        end
+    end
+end
+
 @testset "JointConstraint" begin
     vtypes = [Vector{Float64}, Vector{Float32}]
 
@@ -436,7 +524,8 @@ end
           HMCUtilities.LowerBoundedConstraint(0.0),
           HMCUtilities.UpperBoundedConstraint(1.0),
           HMCUtilities.BoundedConstraint(0.0, 1.0),
-          HMCUtilities.UnitVectorConstraint(4)]
+          HMCUtilities.UnitVectorConstraint(4),
+          HMCUtilities.UnitSimplexConstraint(3)]
 
     y = Float64[]
     x = Float64[]

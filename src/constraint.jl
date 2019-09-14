@@ -528,6 +528,127 @@ end
 
 
 """
+    UnitSimplexConstraint{N,M} <: VariableConstraint{N,M}
+
+Transformation from an `n`-dimensional vector of positive reals with a unit
+ℓ¹-norm to an unconstrained `m = n - 1`-dimensional vector.
+
+This constraint uses the stick-breaking process to define the transformation.
+See https://en.wikipedia.org/wiki/Dirichlet_process#The_stick-breaking_process
+for more details.
+
+# Constructor
+
+    UnitSimplexConstraint(n::Int)
+"""
+struct UnitSimplexConstraint{N,M} <: VariableConstraint{N,M} end
+
+UnitSimplexConstraint(n::Int) = UnitSimplexConstraint{n,n-1}()
+
+"""
+    stick_ratio(x, Σx)
+
+Break a piece of length `x` off of a unit-length stick off of which pieces of
+total length `Σx` have already been broken. Return the ratio of the length `x`
+to the remaining length of the stick.
+"""
+stick_ratio(x, Σx) = x / (1 - Σx)
+
+"""
+    stick_length(r, Σx)
+
+Inverse of `stick_ratio`.
+"""
+stick_length(r, Σx) = r * (1 - Σx)
+
+"""
+    constrain_stick_ratio(k, y, K)
+
+Constrain the free variable `y` to the `k`th of `K` stick ratios.
+"""
+constrain_stick_ratio(k, y, K) = logistic(y - log(K - k))
+
+"""
+    free_stick_ratio(k, r, K)
+
+Free the `k`th stick ratio `r` of `K` stick ratios to an unconstrained variable.
+"""
+free_stick_ratio(k, r, K) = logit(r) + log(K - k)
+
+function clamp(::UnitSimplexConstraint, x)
+    ϵ = eps(eltype(x))
+    return normalize(clamp.(x, ϵ, 1 - ϵ), 1)
+end
+
+clamp(::UnitSimplexConstraint, x::AbstractArray{<:ForwardDiff.Dual}) = x
+
+function free(c::UnitSimplexConstraint, x)
+    K = constrain_dimension(c)
+    @assert length(x) == K
+
+    x = clamp(c, x)
+    T = eltype(x)
+    y = similar(x, K - 1)
+    Σx = zero(T)
+    @inbounds begin
+        y[1] = free_stick_ratio(1, x[1], K)
+        @simd for k = 2:(K - 1)
+            Σx += x[k - 1]
+            zₖ = stick_ratio(x[k], Σx)
+            y[k] = free_stick_ratio(k, zₖ, K)
+        end
+    end
+    return y
+end
+
+function constrain(c::UnitSimplexConstraint, y)
+    K = constrain_dimension(c)
+    @assert length(y) == free_dimension(c)
+
+    x = Zygote.Buffer(y, K)
+    Σx = zero(eltype(y))
+    @inbounds begin
+        for k = 1:(K - 1)
+            zₖ = constrain_stick_ratio(k, y[k], K)
+            xₖ = stick_length(zₖ, Σx)
+            x[k] = xₖ
+            Σx += xₖ
+        end
+        x[K] = 1 - Σx
+    end
+    return clamp(c, copy(x))
+end
+
+function constrain_with_logpdf_correction(c::UnitSimplexConstraint, y)
+    K = constrain_dimension(c)
+    @assert length(y) == free_dimension(c)
+    T = eltype(y)
+
+    x = Zygote.Buffer(y, K)
+    Σx = zero(eltype(y))
+    logdetJ = log(K) / 2
+    @inbounds begin
+        for k = 1:(K - 1)
+            zₖ = constrain_stick_ratio(k, y[k], K)
+            xₖ = stick_length(zₖ, Σx)
+            x[k] = xₖ
+            logdetJ += log(xₖ * (1 - zₖ))
+            Σx += xₖ
+        end
+        x[K] = 1 - Σx
+    end
+
+    return clamp(c, copy(x)), logdetJ
+end
+
+function constrain_with_pushlogpdf_grad(
+        c::UnitSimplexConstraint,
+        y::SubArray
+    )
+    return constrain_with_pushlogpdf_grad(c, collect(y))
+end
+
+"""
     JointConstraint{TC,RC,RF,NC,NF} <: VariableConstraint{NC,NF}
 
 Joint transformation on a series of constraints. This constraint type
