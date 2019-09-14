@@ -760,8 +760,8 @@ function constrain_with_pushlogpdf(jc::JointConstraint, y)
         jc.constraints,
         jc.cranges,
         jc.franges,
-        free_dimension(jc),
         constrain_dimension(jc),
+        free_dimension(jc),
         y
     )
 end
@@ -808,8 +808,8 @@ function constrain_with_pushlogpdf_grad(jc::JointConstraint, y)
         jc.constraints,
         jc.cranges,
         jc.franges,
-        free_dimension(jc),
         constrain_dimension(jc),
+        free_dimension(jc),
         y
     )
 end
