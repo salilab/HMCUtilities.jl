@@ -164,7 +164,7 @@ logπy, ∇y_logπy = pushlogpdf_grad(logπx, ∇x_logπx)
 ```
 """
 function constrain_with_pushlogpdf_grad(c, y)
-    (x, logdetJ), back = Zygote.forward(constrain_with_logpdf_correction, c, y)
+    (x, logdetJ), back = Zygote.pullback(constrain_with_logpdf_correction, c, y)
     nf = free_dimension(c)
 
     return x, function (logπx, ∇x_logπx)
@@ -178,7 +178,7 @@ function constrain_with_pushlogpdf_grad(c, y)
 end
 
 function constrain_with_pushlogpdf_grad(c::UnivariateConstraint, y::Real)
-    (x, logdetJ), back = Zygote.forward(constrain_with_logpdf_correction, c, y)
+    (x, logdetJ), back = Zygote.pullback(constrain_with_logpdf_correction, c, y)
 
     return x, function (logπx, ∇x_logπx::Real)
         s = Zygote.sensitivity(logdetJ)
@@ -822,7 +822,7 @@ Zygote.@adjoint function _parallel_constrain_with_logpdf_correction(cs, cranges,
         @inbounds begin
             yᵢ = view(y, franges[i])
             (xᵢ, logdetJᵢ), backᵢ = (
-                Zygote.forward(constrain_with_logpdf_correction, cs[i], yᵢ)
+                Zygote.pullback(constrain_with_logpdf_correction, cs[i], yᵢ)
             )
             setindex!(x, xᵢ, cranges[i])
         end

@@ -99,7 +99,7 @@ function _test_constraint(
 
     @testset "jacobian consistency" begin
         J = HMCUtilities.constrain_jacobian(c, y)
-        J2, back = Zygote.forward(HMCUtilities.constrain_jacobian, c, y)
+        J2, back = Zygote.pullback(HMCUtilities.constrain_jacobian, c, y)
         @test J ≈ J2
     end
 

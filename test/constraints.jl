@@ -470,7 +470,7 @@ end
         J = Js[n - 1]
         ∇y_logdetJ = ∇y_logdetJs[n - 1]
 
-        logπx, back = Zygote.forward(x -> sum((alpha .- 1) .* log.(x)), x)
+        logπx, back = Zygote.pullback(x -> sum((alpha .- 1) .* log.(x)), x)
         ∇x_logπx = back(1.0)[1]
 
         logdetJ = _logabsdet(J'J)[1] / 2
