@@ -9,13 +9,13 @@ using AdvancedHMC:
     AbstractProposal,
     AbstractIntegrator,
     PhasePoint,
-    update,
+    resize,
     sample_init,
     step
 import AdvancedHMC: sample
 
 function update_metric(h::Hamiltonian, q::AbstractVector)
-    return update(h, q) # Ensure h.metric has the same dim as q.
+    return resize(h, q) # Ensure h.metric has the same dim as q.
 end
 
 function make_phasepoint(rng::AbstractRNG, h::Hamiltonian, q::AbstractVector)
