@@ -526,6 +526,51 @@ function constrain_with_logpdf_correction(::UnitVectorConstraint, y)
     return x, logdetJ
 end
 
+"""
+    UnitVectorScaledConstraint{N} <: OneToOneConstraint{N}
+
+Transformation from an `n`-dimensional unit-vector to an unconstrained
+`n`-dimensional vector, scaled by a factor of ``r``.
+
+``r`` is interpreted as a radius. This is intended to bring directional/quaternion
+vectors to the same approximate initial scale as other variables.
+
+# Constructor
+
+    UnitVectorScaledConstraint(n::Int, r = 1)
+"""
+struct UnitVectorScaledConstraint{N,T<:Real} <: OneToOneConstraint{N}
+    r::T
+
+    function UnitVectorScaledConstraint{N,T}(r::T) where {N,T}
+        isinteger(N) && N > 0 || throw(DomainError("N must be a positive integer."))
+        r > 0 || throw(DomainError("r must be strictly positive."))
+        return new{N,T}(r)
+    end
+end
+
+UnitVectorScaledConstraint(n, r = 1.0) = UnitVectorScaledConstraint{n,typeof(r)}(r)
+
+function Base.show(io::IO, mime::MIME"text/plain",
+                   c::UnitVectorScaledConstraint{N}) where {N}
+    print(io, "UnitVectorScaledConstraint($N, c.r)")
+end
+
+clamp(::UnitVectorScaledConstraint, x) = normalize(x)
+clamp(::UnitVectorScaledConstraint, x::AbstractArray{<:ForwardDiff.Dual}) = x
+
+free(c::UnitVectorScaledConstraint, x) = normalize(x) .* c.r
+
+function constrain(::UnitVectorScaledConstraint, y)
+    x = y ./ norm(y)
+    return x
+end
+
+function constrain_with_logpdf_correction(c::UnitVectorScaledConstraint, y)
+    x, ny = normalize_with_norm(y)
+    logdetJ = -(ny / c.r)^2 / 2
+    return x, logdetJ
+end
 
 """
     UnitSimplexConstraint{N,M} <: VariableConstraint{N,M}

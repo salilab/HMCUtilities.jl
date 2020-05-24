@@ -429,6 +429,44 @@ end
     end
 end
 
+@testset "UnitVectorScaledConstraint" begin
+    vtypes = [Vector{Float64}, Vector{Float32}]
+
+    @testset "n=$n, r=$r" for n in 2:4, r in (1.0, 3.0, 1.0)
+        c = HMCUtilities.UnitVectorScaledConstraint(n, r)
+        κμ = rand() * normalize(randn(n))
+
+        y = randn(n) .* r
+        x = normalize(y)
+        y_exp = copy(x) .* r
+        logπx = dot(x, κμ)  # vMF
+        ∇x_logπx = κμ
+        logπy_exp = logπx - dot(y, y) / r^2 / 2
+        ∇y_logπy_exp = (I - x * x') * ∇x_logπx / norm(y) - y ./ r^2
+
+        test_constraint(
+            c,
+            x,
+            y,
+            logπx,
+            ∇x_logπx,
+            y_exp,
+            logπy_exp,
+            ∇y_logπy_exp;
+            cvtypes=vtypes,
+            fvtypes=vtypes,
+            test_logdetJ_consistency = false
+        )
+
+        @testset "clamp" begin
+            xbound = normalize(y)
+            @test constrain(c, y) ≈ xbound
+            @test constrain_with_pushlogpdf(c, y)[1] ≈ xbound
+            @test constrain_with_pushlogpdf_grad(c, y)[1] ≈ xbound
+        end
+    end
+end
+
 @testset "UnitSimplexConstraint" begin
     vtypes = [Vector{Float64}, Vector{Float32}]
 
